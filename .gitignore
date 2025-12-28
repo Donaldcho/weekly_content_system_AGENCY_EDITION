@@ -1,0 +1,63 @@
+# Environment Variables
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak
+venv.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / Packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Config
+# (If project_config.py contains hardcoded secrets, exclude it. 
+# Currently it loads from env, so it's safe if .env is ignored, 
+# but double check. It is safe.) 
+
+# Testing
+.coverage
+htmlcov/
+pytest_cache/
+
+# Artifacts/Memory (State)
+memory/
+!memory/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+assets/images/*.png
+assets/uploads/
+assets/videos/
+assets/temp_refs/
