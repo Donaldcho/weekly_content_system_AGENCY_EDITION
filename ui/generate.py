@@ -496,7 +496,8 @@ def render_generate_page():
                         "facebook_draft": day_data.get('facebook_draft', ''),
                         "content": content, # Primary display content for scheduler preview
                         "image_path": day_data.get('image_path', ''),
-                        "scheduled_time": None # TBD in scheduler UI
+                        "scheduled_time": None, # TBD in scheduler UI
+                        "client_id": st.session_state.get('current_client_id', 1)
                     }
                     st.session_state.db.add_scheduled_post(post_item)
                     

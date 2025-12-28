@@ -2,14 +2,14 @@ from datetime import datetime, timedelta
 from backend.database import Database
 import streamlit as st
 
-def get_calendar_events():
+def get_calendar_events(client_id=1):
     """
     Fetches posts and formats them for FullCalendar.js
     """
     if 'db' not in st.session_state:
         st.session_state.db = Database()
         
-    posts = st.session_state.db.get_all_posts() 
+    posts = st.session_state.db.get_all_posts(client_id=client_id) 
     
     calendar_events = []
     

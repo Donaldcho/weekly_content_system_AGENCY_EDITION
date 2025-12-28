@@ -133,60 +133,69 @@ class Database:
                 )
             ''')
             
-            # --- ENTERPRISE RBAC ---
+            # --- AGENCY MULTI-TENANCY ---
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS clients (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE,
+                    logo_path TEXT,
+                    industry TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # Seed Default Client if empty (Migration Step 1)
+            cursor.execute("SELECT COUNT(*) FROM clients")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("INSERT INTO clients (name, industry) VALUES (?, ?)", ("Default Agency", "General"))
+                default_client_id = cursor.lastrowid
+                print(f"DEBUG: Created Default Client ID: {default_client_id}")
+            else:
+                cursor.execute("SELECT id FROM clients ORDER BY id ASC LIMIT 1")
+                default_client_id = cursor.fetchone()[0]
+
+            # --- USERS (Update) ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE,
                     role TEXT, -- 'admin', 'editor', 'writer'
-                    password_hash TEXT
+                    password_hash TEXT,
+                    client_id INTEGER DEFAULT 1, -- Default to First Client
+                    agency_role TEXT -- 'super_admin', 'agency_user', 'client_viewer'
                 )
             ''')
             
-            # Migration for passwords
-            try:
-                cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
-                # Set default password for existing users (e.g., "password123")
-                # Hash: 1234 (Dummy example) - actually let's just leave null and handle in logic, 
-                # or better, calculate a hash for "admin"
-                pass 
-            except:
-                pass
-            
-            # Seed Default Users if empty
-            cursor.execute("SELECT COUNT(*) FROM users")
-            if cursor.fetchone()[0] == 0:
-                # Default "admin" / "admin123"
-                # Pre-calculated hash for "admin123" to avoid import overhead here? 
-                # No, just let them be created without password first or use logic?
-                # Let's perform a clean "admin" creation with known hash logic.
-                # Actually, simplest is to just INSERT with a known hash or simple string and let auth handle legacy.
-                # BUT my auth logic is strict PBKDF2.
-                # Let's manually insert a valid hash for "admin123"
-                # Salt: 0000000000000000000000000000000000000000000000000000000000000000 (32 bytes hex)
-                # Hash: ...
-                # Easier: Just use the add_user method? No, init_db shouldn't depend on methods.
-                # I will insert a dummy value and specific check in authenticate_user for bootstrap.
-                 
-                # Better: Allow "password_hash IS NULL" to login with username as password for initial setup.
-                default_users = [
-                    ("Admin User", "admin"),
-                    ("Senior Editor", "editor")
-                ]
-                cursor.executemany("INSERT INTO users (username, role) VALUES (?, ?)", default_users)
-            
-            # --- API LOGS (Cost Intelligence) ---
+            # Migration: Add columns to existing tables
+            try: cursor.execute("ALTER TABLE users ADD COLUMN client_id INTEGER DEFAULT 1") 
+            except: pass
+            try: cursor.execute("ALTER TABLE users ADD COLUMN agency_role TEXT") 
+            except: pass
+
+            # --- API LOGS ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS api_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    agent_name TEXT, -- e.g. Sentinel, VideoDirector
-                    model TEXT, -- e.g. gemini-1.5-flash
+                    agent_name TEXT, 
+                    model TEXT,
                     input_tokens INTEGER,
                     output_tokens INTEGER,
-                    cost_usd REAL
+                    cost_usd REAL,
+                    client_id INTEGER DEFAULT 1
                 )
             ''')
+            try: cursor.execute("ALTER TABLE api_logs ADD COLUMN client_id INTEGER DEFAULT 1")
+            except: pass
+            
+            # --- POSTS ---
+            try: cursor.execute("ALTER TABLE posts ADD COLUMN client_id INTEGER DEFAULT 1")
+            except: pass
+
+            # --- ASSETS ---
+            try: cursor.execute("ALTER TABLE assets ADD COLUMN client_id INTEGER DEFAULT 1")
+            except: pass
+
             
             conn.commit()
 
@@ -250,11 +259,11 @@ class Database:
             conn.commit()
 
     # --- Posts/Schedule ---
-    def get_scheduled_posts(self):
+    def get_scheduled_posts(self, client_id=1):
         with contextlib.closing(self.get_connection()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM posts WHERE status = 'scheduled' ORDER BY scheduled_time ASC")
+            cursor.execute("SELECT * FROM posts WHERE status = 'scheduled' AND client_id = ? ORDER BY scheduled_time ASC", (client_id,))
             rows = cursor.fetchall()
             
             requests = []
@@ -596,10 +605,31 @@ class Database:
             cursor.execute("DELETE FROM users WHERE username = ?", (username,))
             conn.commit()
 
+            cursor.execute("DELETE FROM users WHERE username = ?", (username,))
+            conn.commit()
+
+    # --- CLIENT MGMT (Agency) ---
+    def get_clients(self):
+        with contextlib.closing(self.get_connection()) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM clients")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def add_client(self, name, industry="General"):
+        with contextlib.closing(self.get_connection()) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("INSERT INTO clients (name, industry) VALUES (?, ?)", (name, industry))
+                conn.commit()
+                return cursor.lastrowid
+            except sqlite3.IntegrityError:
+                return None
+
     # --- API LOGS ---
-    def log_usage(self, agent_name, model, input_tokens, output_tokens, override_cost=None):
+    def log_usage(self, agent_name, model, input_tokens, output_tokens, override_cost=None, client_id=1):
         """
-        Logs API usage and estimates cost using Model-Specific Pricing.
+        Logs API usage. Defaults to client_id=1 if not specified.
         """
         # Pricing Table (USD per 1M tokens) - Updated Dec 2025
         # Fallback to Flash rates if unknown
@@ -628,10 +658,18 @@ class Database:
         
         with contextlib.closing(self.get_connection()) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO api_logs (agent_name, model, input_tokens, output_tokens, cost_usd)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (agent_name, model, input_tokens, output_tokens, total_cost))
+            # Try/Except to handle potential schema mismatch if migration failed silently (though we ran DDL above)
+            try:
+                cursor.execute('''
+                    INSERT INTO api_logs (agent_name, model, input_tokens, output_tokens, cost_usd, client_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (agent_name, model, input_tokens, output_tokens, total_cost, client_id))
+            except:
+                # Fallback for legacy schema just in case
+                 cursor.execute('''
+                    INSERT INTO api_logs (agent_name, model, input_tokens, output_tokens, cost_usd)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (agent_name, model, input_tokens, output_tokens, total_cost))
             conn.commit()
             
     def get_api_usage(self):

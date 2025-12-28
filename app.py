@@ -72,7 +72,7 @@ with st.sidebar:
 
     # Profile Header
     st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 2rem;">
+    <div style="text-align: center; margin-bottom: 1rem;">
         <div style="width: 80px; height: 80px; background: linear-gradient(135deg, {role_color}, #2C3E50); border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 2rem;">
             { '🦸‍♂️' if curr_role == 'ADMIN' else '🕵️' if curr_role == 'EDITOR' else '✍️' }
         </div>
@@ -81,6 +81,13 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
+    # --- AGENCY CONTEXT BADGE ---
+    if 'current_client_id' not in st.session_state:
+        st.session_state.current_client_id = 1 # Default
+        st.session_state.current_client_name = "Default Agency"
+        
+    st.info(f"🏢 Workspace: **{st.session_state.get('current_client_name', 'Unknown')}**")
+
     # --- NAVIGATION SYSTEM ---
     
     # 1. Define Structure
@@ -108,6 +115,7 @@ with st.sidebar:
     
     # Dynamic Admin Injection
     if st.session_state.current_user['role'] == 'admin':
+        NAV_STRUCTURE["🏢 Headquarters"].insert(0, "🏢 Command Center") # Agency Dashboard
         NAV_STRUCTURE["⚙️ Settings"].insert(0, "👥 User Management")
     
     # 2. State Management for Nav
@@ -160,7 +168,11 @@ with st.sidebar:
         st.rerun()
 
 # --- PAGE ROUTING ---
-if selected_page == "📊 Dashboard":
+if selected_page == "🏢 Command Center":
+    from ui.agency_dashboard import render_agency_dashboard
+    render_agency_dashboard()
+
+elif selected_page == "📊 Dashboard":
     render_dashboard()
     
 elif selected_page == "📡 The Sentinel":
