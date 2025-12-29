@@ -86,7 +86,7 @@ Login with default credentials:
 
 ## 📂 Documentation
 - [User Manual](docs/USER_MANUAL.md) - How to use the features.
-- [Technical Docs](docs/TECHNICAL_DOCS.md) - Deep dive into code & architecture.
+- [Technical Architecture](docs/TECHNICAL_DOCS.md) - Deep dive into Agents & Engines.
 
 ---
 

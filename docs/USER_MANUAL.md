@@ -1,76 +1,81 @@
-# Deviceterra Enterprise: User Manual 📘
+# 📘 Deviceterra User Manual
 
-Welcome to **Deviceterra**, the AI Operating System for your marketing team. This guide will help you navigate the system.
-
-## 🧭 Navigation
-The sidebar is organized into functional departments:
-
-### 🏢 Headquarters
-The command center for strategy and oversight.
-- **📊 Dashboard**: View high-level metrics (Costs, ROI, Agent Activity).
-- **💰 CRM & ROI**: Track leads and attribution across campaigns.
-- **📡 The Sentinel**: Monitor competitor activity and brand sentiment in real-time.
-
-### 🎨 Creative Studio
-Where content is born.
-- **✨ Content Studio (Magic Studio)**: The main engine. Enter a topic, and watch 4 AI agents plan, draft, and review a week's worth of content.
-- **🎬 AI Video Director**: Generate scripts and storyboards for TikTok/Reels.
-- **🎨 Visual Editor**: Create custom images using NanoBanana (Gemini 3 Pro).
-- **🚀 Multiplier**: Repurpose one successful post into a multi-channel campaign.
-
-### ⚡ Operations
-Execution and engagement.
-- **📅 Scheduler**: Drag-and-drop calendar to manage your publishing queue.
-- **💬 Community Central**: Unified inbox for responding to comments with AI "Smart Replies".
-
-### ⚙️ Settings
-Configuration.
-- **🧬 Brand Identity**: Define your brand voice, upload manifestos, and analyze your logo.
-- **🔌 Connections**: Connect your LinkedIn and Facebook accounts.
+Welcome to **Deviceterra**, your automated AI Marketing Agency. This guide will help you produce weeks of high-quality social media content in minutes.
 
 ---
 
-## 🚀 How to Generate a Weekly Campaign
+## 🚀 Getting Started
 
-1.  Navigate to **🎨 Creative Studio** -> **✨ Content Studio**.
-2.  **Input Topic**: Enter a theme (e.g., "AI Ethics" or "Black Friday Sale").
-3.  **Add Trends**: (Optional) Paste current trends or let the system fetch them.
-4.  **Click "Generate Campaign"**:
-    *   **Strategist Agent** creates a 7-day plan.
-    *   **Creator Agent** writes drafts for LinkedIn & Facebook.
-    *   **Art Director** generates image prompts.
-    *   **Reviewer Agent** scores the content (0-100) and fixes issues.
-5.  **Review**: See the generated plan. Click "Approve" to send posts to the **Scheduler**.
+### 1. Dashboard Overview
+Upon logging in, you will see the **Mission Control**.
+*   **Generate**: The primary workspace for creating content.
+*   **Schedule**: view your calendar grid.
+*   **Brand DNA**: Configure your company's voice and style.
+*   **Vault**: Your asset library (saved visuals).
 
 ---
 
-## 🛡️ Using Compliance Guard
-Deviceterra protects your brand reputation automatically.
+## 🎨 Step 1: Define Your Brand
+Before generating content, teach the AI who you are.
 
-1.  When generating content, you will see a **Risk Score**.
-2.  If the score is < 80, the system flags the post as **WARN**.
-3.  Click "View Report" to see:
-    *   **Legal Risks**: Unverified claims or guarantees.
-    *   **PR Risks**: Tone-deaf or offensive language.
-    *   **Banned Words**: Specific words forbidden by your brand policy.
-
----
-
-## 💰 Cost Monitoring
-Navigate to **🏢 Headquarters** -> **📊 Dashboard**.
-- **Visual Monitor**: See a real-time graph of token usage.
-- **Cost Table**: See exactly which agent spent what.
-    *   *Example*: "Strategist spent $0.02 planning the week."
-    *   *Example*: "NanoBanana spent $0.04 generating an image."
+1.  Navigate to **Brand DNA** in the sidebar.
+2.  **Basic Info**: Enter your Company Name and Industry.
+3.  **Target Audience**: Describe who you are talking to (e.g., "CTOs of Series A startups").
+4.  **Brand Voice**: Choose a tone (e.g., "Professional", "Witty") or paste a sample of your writing for analysis.
+5.  **Visual Identity**: Define your color palette and preferred art style (e.g., "Minimalist Tech", "Cyberpunk").
+    *   *Tip: Use the "Visualize" preview to see how your style looks.*
 
 ---
 
-## 🎬 Video Studio Workflow
-1.  Go to **AI Video Director**.
-2.  Enter a Topic (e.g., "The Future of AI").
-3.  **Generate Script**: The AI writes a scene-by-scene script with voiceovers.
-4.  **Visualize**: Click "Visualize Scenes" to generate keyframes for every scene.
-5.  **Render**: (Simulation) outputs a "final" video file to your Vault.
+## ⚡ Step 2: Generate a Weekly Plan
+The **Strategist Agent** plans your week based on your brand and trends.
+
+1.  Navigate to **Generate**.
+2.  **Campaign Topic**: Enter a main theme (e.g., "The Future of AI Agents").
+3.  **Trend Data**: (Optional) Paste links or keywords about current news.
+4.  Click **✨ Generate Weekly Plan**.
+5.  **Review**: The Agents will produce 5-7 drafts (LinkedIn/Facebook post pairs).
+    *   Read the drafts.
+    *   Click **Edit** on any text to tweak the copy.
 
 ---
-*For technical details, see [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md).*
+
+## 🍌 Step 3: Nano Banana Vision (Images)
+Bring your posts to life with the integrated image engine.
+
+1.  Scroll to the **Visuals** section of a post draft.
+2.  **Source**:
+    *   **Smart Style**: AI automatically dreams up a prompt based on the post text.
+    *   **Prompt**: Write your own description.
+    *   **Vault**: Pick a pre-saved image.
+3.  **Engine Class**:
+    *   **Nano Pro**: Highest quality (slower). Best for final assets.
+    *   **Nano**: Faster, good for drafting.
+4.  Click **✨ Summon Nano Banana**.
+5.  The image will appear. If you don't like it, click **Re-roll**.
+
+---
+
+## 📅 Step 4: Schedule & Publish
+1.  Once happy with text and image, click **📅 Schedule**.
+2.  Navigate to the **Schedule** page to see your calendar.
+3.  (Future Feature) Automated posting to LinkedIn via API is configured in the **Connections** tab.
+
+---
+
+## 🧠 Advanced: Customizing the AI Personality
+Want the "Creative Director" to think differently?
+
+1.  Open the file `assets/prompts.json` in your project folder.
+2.  Edit the **System Instructions** for `visual_agent_system` or `smart_style_generator`.
+3.  Save the file. The agents update instantly—no restart required.
+
+---
+
+## ❓ FAQ
+
+**Q: Why do my images look like neon sci-fi?**
+A: Check your `prompts.json`. Ensure you haven't told the AI to always use "Futuristic" styles. You can tone it down by adding "Realistic, corporate photography" to your Brand DNA.
+
+**Q: I get a "Quota Exceeded" error.**
+A: You may have hit the free tier limit of the Google Gemini API. Wait a few minutes or upgrade your API key quotas.
