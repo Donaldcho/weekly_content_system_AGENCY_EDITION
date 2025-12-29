@@ -192,70 +192,101 @@ class Database:
             try: cursor.execute("ALTER TABLE posts ADD COLUMN client_id INTEGER DEFAULT 1")
             except: pass
 
-            # --- ASSETS ---
-            try: cursor.execute("ALTER TABLE assets ADD COLUMN client_id INTEGER DEFAULT 1")
+            # --- ASSETS (Table Name: vault) ---
+            try: cursor.execute("ALTER TABLE vault ADD COLUMN client_id INTEGER DEFAULT 1")
             except: pass
 
+            # --- ISOLATION MIGRATION (Brand & Social) ---
+            # 1. Brand Identity per Client
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS client_brand_settings (
+                    client_id INTEGER PRIMARY KEY,
+                    content TEXT
+                )
+            ''')
+            # Migrate legacy
+            try:
+                cursor.execute("INSERT OR IGNORE INTO client_brand_settings (client_id, content) SELECT 1, content FROM brand_settings WHERE id=1")
+            except: pass
+            
+            # 2. Social Tokens per Client
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS client_social_tokens (
+                    client_id INTEGER,
+                    platform TEXT,
+                    access_token TEXT,
+                    refresh_token TEXT,
+                    expires_at TIMESTAMP,
+                    user_id TEXT,
+                    id_token TEXT,
+                    scopes TEXT,
+                    PRIMARY KEY (client_id, platform)
+                )
+            ''')
+            # Migrate legacy (Attach existing tokens to Default Client)
+            try:
+                cursor.execute("INSERT OR IGNORE INTO client_social_tokens (client_id, platform, access_token, refresh_token, expires_at, user_id, id_token, scopes) SELECT 1, platform, access_token, refresh_token, expires_at, user_id, id_token, scopes FROM social_tokens")
+            except: pass
             
             conn.commit()
 
     # --- Social Tokens ---
-    def save_token(self, platform, access_token, refresh_token, expires_at, user_id, id_token=None, scopes=None):
+    # --- Social Tokens (Client Isolated) ---
+    def save_token(self, platform, access_token, refresh_token, expires_at, user_id, id_token=None, scopes=None, client_id=1):
         with contextlib.closing(self.get_connection()) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT OR REPLACE INTO social_tokens (platform, access_token, refresh_token, expires_at, user_id, id_token, scopes)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (platform, access_token, refresh_token, expires_at, user_id, id_token, scopes))
+                INSERT OR REPLACE INTO client_social_tokens (client_id, platform, access_token, refresh_token, expires_at, user_id, id_token, scopes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (client_id, platform, access_token, refresh_token, expires_at, user_id, id_token, scopes))
             conn.commit()
 
-    def get_token(self, platform):
+    def get_token(self, platform, client_id=1):
         with contextlib.closing(self.get_connection()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM social_tokens WHERE platform = ?", (platform,))
+            cursor.execute("SELECT * FROM client_social_tokens WHERE platform = ? AND client_id = ?", (platform, client_id))
             row = cursor.fetchone()
             if row:
                 return dict(row)
             return None
 
-    def delete_token(self, platform):
+    def delete_token(self, platform, client_id=1):
         with contextlib.closing(self.get_connection()) as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM social_tokens WHERE platform = ?", (platform,))
+            cursor.execute("DELETE FROM client_social_tokens WHERE platform = ? AND client_id = ?", (platform, client_id))
             conn.commit()
 
     # --- Brand Settings ---
-    def get_brand_settings(self):
+    # --- Brand Settings (Client Isolated) ---
+    def get_brand_settings(self, client_id=1):
         with contextlib.closing(self.get_connection()) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT content FROM brand_settings WHERE id = 1")
+            cursor.execute("SELECT content FROM client_brand_settings WHERE client_id = ?", (client_id,))
             row = cursor.fetchone()
             if row:
                 content = row[0]
-                # Try to parse as JSON, if it looks like it
                 try:
                     return json.loads(content)
                 except:
-                    # Legacy string format support
                     return content
             # Default fallback if empty
             return {
-                "name": "Deviceterra",
-                "industry": "AI",
+                "name": "New Client",
+                "industry": "General",
                 "tone": "Professional",
-                "mission": "Empowering the future.",
+                "mission": "To be defined.",
                 "colors": []
             }
 
-    def save_brand_settings(self, content):
+    def save_brand_settings(self, content, client_id=1):
         # If content is a dict, serialize it
         if isinstance(content, dict):
             content = json.dumps(content, cls=DateTimeEncoder)
             
         with contextlib.closing(self.get_connection()) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO brand_settings (id, content) VALUES (1, ?)", (content,))
+            cursor.execute("INSERT OR REPLACE INTO client_brand_settings (client_id, content) VALUES (?, ?)", (client_id, content))
             conn.commit()
 
     # --- Posts/Schedule ---
@@ -307,12 +338,12 @@ class Database:
             cursor.execute("SELECT scheduled_time FROM posts WHERE status IN ('scheduled', 'posted') AND scheduled_time IS NOT NULL")
             return [row[0] for row in cursor.fetchall()]
             
-    def get_all_posts(self):
+    def get_all_posts(self, client_id=1):
         """Retrieves all posts regardless of status (Draft, Scheduled, Posted)"""
         with contextlib.closing(self.get_connection()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM posts ORDER BY scheduled_time ASC")
+            cursor.execute("SELECT * FROM posts WHERE client_id = ? ORDER BY scheduled_time ASC", (client_id,))
             rows = cursor.fetchall()
             
             requests = []
@@ -399,11 +430,11 @@ class Database:
                 cursor.execute("UPDATE posts SET scheduled_time = ?, content = ? WHERE id = ?", (new_date_iso, new_blob, post_id))
                 conn.commit()
 
-    def get_history(self, limit=50):
+    def get_history(self, limit=50, client_id=1):
         with contextlib.closing(self.get_connection()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM posts WHERE status = 'posted' ORDER BY scheduled_time DESC LIMIT ?", (limit,))
+            cursor.execute("SELECT * FROM posts WHERE status = 'posted' AND client_id = ? ORDER BY scheduled_time DESC LIMIT ?", (client_id, limit))
             rows = cursor.fetchall()
             
             history = []
@@ -414,17 +445,17 @@ class Database:
                 history.append(data)
             return history
             
-    def get_top_performing_posts(self, limit=3):
+    def get_top_performing_posts(self, limit=3, client_id=1):
         """Fetches top posts based on engagement rate."""
         with contextlib.closing(self.get_connection()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM posts 
-                WHERE status = 'posted' 
+                WHERE status = 'posted' AND client_id = ?
                 ORDER BY engagement_rate DESC 
                 LIMIT ?
-            """, (limit,))
+            """, (client_id, limit,))
             rows = cursor.fetchall()
             
             top_posts = []
@@ -464,15 +495,18 @@ class Database:
             ''', (filename, file_path, asset_type, tags))
             conn.commit()
             
-    def get_vault_assets(self, filter_type=None):
+    def get_vault_assets(self, filter_type=None, client_id=1):
         with contextlib.closing(self.get_connection()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            query = "SELECT * FROM vault ORDER BY created_at DESC"
-            params = ()
+            
+            # Base query needs client_id
             if filter_type:
-                query = "SELECT * FROM vault WHERE asset_type = ? ORDER BY created_at DESC"
-                params = (filter_type,)
+                query = "SELECT * FROM vault WHERE asset_type = ? AND client_id = ? ORDER BY created_at DESC"
+                params = (filter_type, client_id)
+            else:
+                query = "SELECT * FROM vault WHERE client_id = ? ORDER BY created_at DESC"
+                params = (client_id,)
                 
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
@@ -597,6 +631,20 @@ class Database:
                     
             return None
 
+    def get_clients(self):
+        with contextlib.closing(self.get_connection()) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM clients ORDER BY id ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def add_client(self, name, industry="General"):
+        with contextlib.closing(self.get_connection()) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO clients (name, industry) VALUES (?, ?)", (name, industry))
+            conn.commit()
+            return cursor.lastrowid
+            
     def delete_user(self, username):
         # Prevent deleting the last Admin or strictly "Admin User" if desired, 
         # but for flexibility we just allow deletion (UI should warn).
@@ -604,27 +652,6 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM users WHERE username = ?", (username,))
             conn.commit()
-
-            cursor.execute("DELETE FROM users WHERE username = ?", (username,))
-            conn.commit()
-
-    # --- CLIENT MGMT (Agency) ---
-    def get_clients(self):
-        with contextlib.closing(self.get_connection()) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM clients")
-            return [dict(row) for row in cursor.fetchall()]
-
-    def add_client(self, name, industry="General"):
-        with contextlib.closing(self.get_connection()) as conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute("INSERT INTO clients (name, industry) VALUES (?, ?)", (name, industry))
-                conn.commit()
-                return cursor.lastrowid
-            except sqlite3.IntegrityError:
-                return None
 
     # --- API LOGS ---
     def log_usage(self, agent_name, model, input_tokens, output_tokens, override_cost=None, client_id=1):
@@ -672,18 +699,18 @@ class Database:
                 ''', (agent_name, model, input_tokens, output_tokens, total_cost))
             conn.commit()
             
-    def get_api_usage(self):
+    def get_api_usage(self, client_id=1):
         """Returns log entries for the dashboard."""
         with contextlib.closing(self.get_connection()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM api_logs ORDER BY timestamp DESC LIMIT 100")
+            cursor.execute("SELECT * FROM api_logs WHERE client_id = ? ORDER BY timestamp DESC LIMIT 100", (client_id,))
             return [dict(row) for row in cursor.fetchall()]
             
-    def get_total_cost(self):
+    def get_total_cost(self, client_id=1):
         """Returns the sum of all costs."""
         with contextlib.closing(self.get_connection()) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT SUM(cost_usd) FROM api_logs")
+            cursor.execute("SELECT SUM(cost_usd) FROM api_logs WHERE client_id = ?", (client_id,))
             result = cursor.fetchone()[0]
             return result if result else 0.0

@@ -85,7 +85,8 @@ class AnalyticsSensor:
             else:
                 print(f"LinkedIn Comments Error ({r.status_code}): {r.text} | URL: {url}")
         except Exception as e:
-        return []
+            print(f"Error fetching LinkedIn comments: {e}")
+            return []
 
     def fetch_facebook_metrics(self, social_id, token):
         """

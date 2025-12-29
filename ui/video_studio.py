@@ -5,8 +5,9 @@ import os
 from backend.video_director import VideoDirector
 
 def render_video_studio_page():
-    if 'video_director' not in st.session_state:
-        st.session_state.video_director = VideoDirector()
+    current_client_id = st.session_state.get('current_client_id', 1)
+    if 'video_director' not in st.session_state or getattr(st.session_state.video_director, 'client_id', None) != current_client_id:
+        st.session_state.video_director = VideoDirector(client_id=current_client_id)
         
     st.title("🎬 AI Video Director")
     st.caption("Short-Form Video Production: Script-to-Storyboard")

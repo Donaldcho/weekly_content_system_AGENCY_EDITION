@@ -6,6 +6,7 @@ from project_config import Config
 from backend.content_generator import ContentGenerator
 from backend.nano_banana import NanoBanana
 from backend.ui_utils import st_image_robust
+from backend.template_manager import TemplateManager # Added
 from ui.preview import render_mobile_preview
 from backend.linkedin_poster import post_to_linkedin
 from backend.linkedin_poster import post_to_linkedin
@@ -15,11 +16,18 @@ from backend.compliance_guard import ComplianceGuard
 def render_generate_page():
     st.header("✨ Weekly Content Generator")
     
-    # Initialize Backends
-    if 'content_gen' not in st.session_state:
-        st.session_state.content_gen = ContentGenerator()
+    # Initialize Backends (Client-Aware)
+    current_client_id = st.session_state.get('current_client_id', 1)
+    
+    # 1. Content Generator
+    if 'content_gen' not in st.session_state or getattr(st.session_state.content_gen, 'client_id', None) != current_client_id:
+        st.session_state.content_gen = ContentGenerator(client_id=current_client_id)
+        
+    # 2. Image Generator (NanoBanana is stateless for now, but good practice)
     if 'image_gen' not in st.session_state:
         st.session_state.image_gen = NanoBanana()
+        
+    # 3. Compliance
     if 'compliance_guard' not in st.session_state:
         st.session_state.compliance_guard = ComplianceGuard()
     
@@ -275,7 +283,7 @@ def render_generate_page():
                     # Visual Source Selection
                     visual_source = st.radio(
                         "Source", 
-                        ["Generate (Prompt)", "Vault (Saved Designs)", "Upload File (Bypass)", "Style Reference"],
+                        ["Generate (Prompt)", "Use Template", "Vault (Saved Designs)", "Upload File (Bypass)", "Style Reference"],
                         horizontal=True,
                         key=f"viz_src_{i}"
                     )
@@ -284,7 +292,55 @@ def render_generate_page():
                     ref_image_path = None
                     bypass_generation = False
                     
-                    if visual_source == "Generate (Prompt)":
+                    # --- OPTION: TEMPLATE ---
+                    if visual_source == "Use Template":
+                        # Fetch Templates
+                        from backend.vault import VaultManager 
+                        if 'template_manager' not in st.session_state:
+                             vault_styles = VaultManager(Config().ASSETS_DIR + "/vault")
+                             st.session_state.template_manager = TemplateManager(st.session_state.db, vault_styles)
+                        
+                        tm = st.session_state.template_manager
+                        templates = tm.get_templates(client_id=current_client_id)
+                        
+                        if templates:
+                            t_map = {t['name']: t for t in templates}
+                            sel_t_name = st.selectbox("Select Visual Template", list(t_map.keys()), key=f"tpl_sel_{i}")
+                            selected_t = t_map[sel_t_name]
+                            
+                            st.caption(f"📝 Style DNA: {selected_t['description'][:100]}...")
+
+                            # Smart Synthesis Logic
+                            # Get the content context (Draft text)
+                            draft_ctx = day_data.get('linkedin_draft', '') or day_data.get('facebook_draft', '') or day_data.get('topic', '')
+                            
+                            # We want a button to trigger this so it doesn't burn tokens on every rerun
+                            gen_col1, gen_col2 = st.columns([2, 1])
+                            with gen_col2:
+                                if st.button("✨ Tailor Prompt", key=f"smart_p_{i}", help="Rewrite the prompt to fit this exact post"):
+                                    with st.spinner("Synthesizing prompt..."):
+                                        smart_prompt = st.session_state.content_gen.generate_tailored_image_prompt(draft_ctx, selected_t['description'])
+                                        day_data['image_prompt'] = smart_prompt # Update state
+                                        final_prompt = smart_prompt
+                                        st.rerun()
+
+                            # Allow manual override or showing current state
+                            final_prompt = st.text_area("Final Prompt", value=final_prompt if final_prompt else selected_t['description'], height=100, key=f"tpl_fin_p_{i}")
+                                
+                            # Set Reference Image
+                            if selected_t.get('image'):
+                                styles_dir = os.path.join(Config().ASSETS_DIR, "styles")
+                                t_img_path = os.path.join(styles_dir, selected_t['image'])
+                                if os.path.exists(t_img_path):
+                                    ref_image_path = t_img_path
+                                    st_image_robust(t_img_path, width=150)
+                                else:
+                                    st.warning(f"Template image missing at {t_img_path}")
+                        else:
+                            st.warning("No templates found. Create one in Brand Identity.")
+                            final_prompt = st.text_area("Prompt", value=final_prompt, key=f"img_p_fallback_{i}")
+
+                    elif visual_source == "Generate (Prompt)":
                         final_prompt = st.text_area("Prompt", value=final_prompt, height=80, key=f"img_p_{i}")
                     
                     elif visual_source == "Vault (Saved Designs)":
@@ -494,11 +550,12 @@ def render_generate_page():
                         "topic": day_data.get('topic', 'Topic'),
                         "linkedin_draft": day_data.get('linkedin_draft', ''),
                         "facebook_draft": day_data.get('facebook_draft', ''),
-                        "content": content, # Primary display content for scheduler preview
+                        "content": content, 
                         "image_path": day_data.get('image_path', ''),
-                        "scheduled_time": None, # TBD in scheduler UI
+                        "scheduled_time": None, 
                         "client_id": st.session_state.get('current_client_id', 1)
                     }
+                    print(f"DEBUG: Saving Draft - Topic: {post_item['topic']}, Image: {post_item['image_path']}")
                     st.session_state.db.add_scheduled_post(post_item)
                     
                 st.success(f"Drafts ({target_platform}) pushed to Scheduler! Go there to launch.")

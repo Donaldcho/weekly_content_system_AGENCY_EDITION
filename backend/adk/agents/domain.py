@@ -1,0 +1,51 @@
+from backend.adk.tools import Toolbox
+import google.generativeai as genai
+import json
+
+class BaseAdkAgent:
+    def __init__(self, name, model="gemini-2.0-flash-exp"):
+        self.name = name
+        self.model_name = model
+        self.tools = Toolbox()
+        self.model = genai.GenerativeModel(model)
+
+    def generate(self, prompt, json_mode=True):
+        """
+        Standard generation wrapper with JSON enforcement.
+        """
+        try:
+            config = genai.GenerationConfig(response_mime_type="application/json") if json_mode else None
+            response = self.model.generate_content(prompt, generation_config=config)
+            return response.text
+        except Exception as e:
+            print(f"[{self.name}] Error: {e}")
+            return "{}"
+
+class DomainAgent(BaseAdkAgent):
+    def suggest_domains(self, keywords_str):
+        """
+        Takes user keywords, generates variations, and checks availability (mock).
+        """
+        # 1. Ideation Phase
+        prompt = f"""
+        You are a Domain Name Expert.
+        User Keywords: {keywords_str}
+        
+        Task: return a JSON list of 10 creative, brandable domain keywords based on the input.
+        Do not add TLDs yet. Just the name part.
+        Example Input: "fast food" -> Output: ["QuickBite", "SpeedyEats", ...]
+        
+        Return JSON Key: "ideas"
+        """
+        raw = self.generate(prompt)
+        try:
+            ideas = json.loads(raw).get("ideas", [])
+        except:
+            ideas = [keywords_str]
+
+        # 2. Validation Phase (Tool Use)
+        # In a full Agent Runtime, the LLM would call this tool. 
+        # Here we manually orchestrate for stability.
+        available = self.tools.check_domains(ideas)
+        
+        return json.loads(available)

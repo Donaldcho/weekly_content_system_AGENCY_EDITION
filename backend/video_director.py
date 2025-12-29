@@ -12,11 +12,12 @@ class VideoDirector:
     1. Scripting (Hook -> Value -> CTA)
     2. Storyboarding (Visualizing scenes with AI images)
     """
-    def __init__(self):
+    def __init__(self, client_id=1):
         genai.configure(api_key=Config().GOOGLE_API_KEY)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
         self.artist = NanoBanana()
         self.db = Database()
+        self.client_id = client_id
 
     def generate_script(self, topic, platform="TikTok", target_duration="30s"):
         """

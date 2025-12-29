@@ -8,15 +8,15 @@ class TemplateManager:
         self.db = db
         self.vault = vault
 
-    def get_templates(self):
+    def get_templates(self, client_id=1):
         """Returns the list of saved visual templates."""
-        settings = self.db.get_brand_settings()
+        settings = self.db.get_brand_settings(client_id=client_id)
         # Handle simple string case just in case
         if isinstance(settings, str): 
              return [] 
         return settings.get("templates", [])
 
-    def add_template(self, name, description, image_file=None):
+    def add_template(self, name, description, image_file=None, client_id=1):
         """
         Adds a new visual template.
         Args:
@@ -24,7 +24,7 @@ class TemplateManager:
             description: The prompt/style description
             image_file: Streamlit UploadedFile (optional)
         """
-        settings = self.db.get_brand_settings()
+        settings = self.db.get_brand_settings(client_id=client_id)
         if isinstance(settings, str): settings = {}
         
         templates = settings.get("templates", [])
@@ -48,12 +48,12 @@ class TemplateManager:
         
         templates.append(new_template)
         settings["templates"] = templates
-        self.db.save_brand_settings(settings)
+        self.db.save_brand_settings(settings, client_id=client_id)
         return new_template
 
-    def delete_template(self, template_id):
+    def delete_template(self, template_id, client_id=1):
         """Deletes a template by ID."""
-        settings = self.db.get_brand_settings()
+        settings = self.db.get_brand_settings(client_id=client_id)
         if isinstance(settings, str): return False
         
         templates = settings.get("templates", [])

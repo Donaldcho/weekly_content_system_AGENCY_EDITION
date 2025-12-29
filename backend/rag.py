@@ -7,6 +7,7 @@ from pypdf import PdfReader
 import contextlib
 from project_config import Config
 from backend.database import Database
+from duckduckgo_search import DDGS
 
 class RAGEngine:
     def __init__(self):
@@ -14,6 +15,7 @@ class RAGEngine:
         self.embed_model = "models/text-embedding-004"
         self.db = Database()
         self.vault_dir = os.path.join(Config().ASSETS_DIR, "vault")
+        self.ddgs = DDGS()
 
     def _get_db_connection(self):
         """Helper to get a fresh connection directly"""
@@ -237,4 +239,22 @@ class RAGEngine:
             
         except Exception as e:
             print(f"Retrieval error: {e}")
+            return []
+
+    def search_web(self, query, max_results=3):
+        """
+        Performs a live web search to ground the agent in reality.
+        """
+        try:
+            results = list(self.ddgs.text(query, max_results=max_results))
+            return [
+                {
+                    "content": r.get('body', ''),
+                    "filename": f"WEB: {r.get('title', 'Source')}",
+                    "score": 1.0 # Trust web results as highly relevant
+                }
+                for r in results
+            ]
+        except Exception as e:
+            print(f"Web Search Error: {e}")
             return []

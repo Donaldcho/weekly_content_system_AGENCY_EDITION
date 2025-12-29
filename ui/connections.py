@@ -23,13 +23,15 @@ def render_connections_page():
             with st.spinner("🔗 Completing connection..."):
                 # 1. First, check the 'state' parameter (the new reliable way)
                 raw_state = st.query_params.get("state")
+                current_client_id = st.session_state.get('current_client_id', 1)
+                
                 # Handle cases where it might be a list or a string
                 platform = raw_state[0] if isinstance(raw_state, list) else raw_state
                 
                 if platform == "linkedin":
-                    success, msg = exchange_linkedin_code(code)
+                    success, msg = exchange_linkedin_code(code, client_id=current_client_id)
                 elif platform == "facebook":
-                    success, msg = exchange_facebook_code(code)
+                    success, msg = exchange_facebook_code(code, client_id=current_client_id)
                 else:
                     # 2. Fallback to 'AQ' check for backward compatibility/legacy flow
                     if isinstance(code, str) and code.startswith("AQ"):

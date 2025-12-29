@@ -16,6 +16,7 @@ class StrategistAgent(BaseAgent):
         {context}
         
         Output a JSON List of objects (one for each day Mon-Sun).
+        CRITICAL: You MUST include all 7 days (Monday through Sunday). Do not skip any days.
         Format:
         [
             {{

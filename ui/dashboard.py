@@ -13,8 +13,9 @@ def render_dashboard():
 
     # --- TIER 1: HUD METRICS ---
     # Fetch Real Data
-    all_posts = st.session_state.db.get_all_posts()
-    vault_assets = st.session_state.db.get_vault_assets()
+    active_client = st.session_state.get('current_client_id', 1)
+    all_posts = st.session_state.db.get_all_posts(client_id=active_client)
+    vault_assets = st.session_state.db.get_vault_assets(client_id=active_client)
     
     # Calc Metrics
     scheduled_count = len([p for p in all_posts if p.get('status') == 'scheduled'])
@@ -139,8 +140,8 @@ def render_dashboard():
     # --- TIER 4: COST INTELLIGENCE ---
     st.subheader("💸 Cost Intelligence (Token Burn)")
     
-    logs = st.session_state.db.get_api_usage()
-    total_cost = st.session_state.db.get_total_cost()
+    logs = st.session_state.db.get_api_usage(client_id=active_client)
+    total_cost = st.session_state.db.get_total_cost(client_id=active_client)
     total_tokens = sum([l['input_tokens'] + l['output_tokens'] for l in logs]) if logs else 0
     
     # Kpi Cards

@@ -2,7 +2,7 @@ import json
 from .base_agent import BaseAgent
 
 class CreatorAgent(BaseAgent):
-    def draft_content(self, day_plan, brand_settings):
+    def draft_content(self, day_plan, brand_settings, critique=None):
         """
         Updated to use Deep Brand DNA.
         brand_settings: The full dict from DB (not just a tone string).
@@ -43,6 +43,8 @@ class CreatorAgent(BaseAgent):
         Focus: {day_plan.get('focus')}
         Angle: {day_plan.get('angle')}
         
+        {f"### ⚠️ REVISION REQUESTED\nCRITIQUE: {critique}\nFix the issues above in this new draft." if critique else ""}
+
         Task: Write TWO distinct drafts.
         
         1. LinkedIn Post:

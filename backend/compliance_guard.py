@@ -50,6 +50,10 @@ class ComplianceGuard:
             if ai_report.get('tone_violation', False):
                  report["issues"].append(f"Tone Mismatch: {ai_report.get('tone_reason')}")
                  report["score"] -= 10
+
+            if ai_report.get('factual_risk', False):
+                 report["issues"].append(f"🧠 REALITY CHECK: {ai_report.get('factual_reason')}")
+                 report["score"] -= 100 # Immediate Fail for hallucinations
                  
         # Final Score Logic
         report["score"] = max(0, report["score"])
@@ -84,7 +88,8 @@ class ComplianceGuard:
         CHECKLIST:
         1. Legal Risk: Does it make specific unverified claims ("We guarantee 100% ROI"), promise results that vary, or slander competitors?
         2. PR Risk: Is it offensive, tone-deaf, politically charged, or likely to cause a backlash?
-        3. Tone Violation: Does it violate the Anti-Patterns listed above?
+        3. Factual Risk: Does it contain claims that are physically impossible or universally known to be false (e.g. "Humans living on Mars", "Time travel")?
+        4. Tone Violation: Does it violate the Anti-Patterns listed above?
 
         Return a JSON object:
         {{
@@ -92,6 +97,8 @@ class ComplianceGuard:
             "legal_reason": "Brief explanation if true",
             "pr_risk": true/false,
             "pr_reason": "Brief explanation if true",
+            "factual_risk": true/false,
+            "factual_reason": "Brief explanation if true",
             "tone_violation": true/false,
             "tone_reason": "Brief explanation if true"
         }}

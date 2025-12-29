@@ -23,15 +23,22 @@ from backend.agents.strategist import StrategistAgent
 from backend.agents.creator import CreatorAgent
 from backend.agents.art_director import ArtDirectorAgent
 from backend.agents.reviewer import ReviewerAgent
+from backend.compliance_guard import ComplianceGuard
 
 class ContentGenerator:
-    def __init__(self):
+    def __init__(self, client_id=1):
         # Configure shared API key setup
         genai.configure(api_key=Config().GOOGLE_API_KEY)
+        self.db = Database()
+        self.client_id = client_id
         
-        # Load Context and Memory
+        # Load Context and Memory from DB (Multi-Tenant)
+        self.company_info = self.db.get_brand_settings(client_id=client_id)
+        
         conf = Config()
-        self.company_info = self._load_file(conf.COMPANY_INFO_PATH)
+        # History is likely still global or needs update, for now keeping file based but note:
+        # Ideally history should be in DB per client too.
+        # But for now, we focus on brand identity.
         self.history = self._load_json(conf.HISTORY_PATH)
         self.rag = RAGEngine()
         self.db = Database()
@@ -42,6 +49,7 @@ class ContentGenerator:
         self.creator = CreatorAgent()
         self.art_director = ArtDirectorAgent()
         self.reviewer = ReviewerAgent()
+        self.compliance = ComplianceGuard()
 
     def _load_file(self, path):
         try:
@@ -89,11 +97,18 @@ class ContentGenerator:
         # 0. Context Gathering (RAG)
         context_str = ""
         if use_rag:
-            print("Agent: Researcher (RAG) working...")
+            print("Agent: Researcher (RAG + Web) working...")
             if progress_callback: progress_callback("🔍 Agent: Researcher (RAG) gathering context...")
+            
+            # 1. Local Vault
             docs = self.rag.retrieve(topic)
+            
+            # 2. Web Research
+            web_docs = self.rag.search_web(topic)
+            docs.extend(web_docs)
+            
             if docs:
-                context_str = "\n".join([f"- {d['content']}" for d in docs])
+                 context_str = "\n".join([f"[{d['filename']}] {d['content']}" for d in docs])
         
         # 1. STRATEGIST: Plan the Week
         print("Agent: Strategist planning...")
@@ -126,9 +141,34 @@ class ContentGenerator:
             if progress_callback: progress_callback(f"⚡ [Day {i+1}/{total_days}] processing {day_name}...")
             
             # A. Creator (Drafting)
+            # A. Creator (Drafting) with CRITIC LOOP
             if progress_callback: progress_callback(f"✍️ [Day {i+1}/{total_days}] Creator writing drafts for {day_name}...")
-            drafts = self.creator.draft_content(day_item, self.company_info)
-            if not isinstance(drafts, dict): drafts = {} # Safety fallback
+            
+            drafts = {}
+            critique = None
+            max_retries = 2
+            
+            for attempt in range(max_retries + 1):
+                if attempt > 0:
+                     print(f"  [Attempt {attempt+1}] Improving draft based on critique...")
+                
+                drafts = self.creator.draft_content(day_item, self.company_info, critique)
+                if not isinstance(drafts, dict): drafts = {}
+                
+                # Check Compliance (Guardrail)
+                # Primary check on LinkedIn draft
+                text_to_check = drafts.get('linkedin_draft', '') or drafts.get('facebook_draft', '')
+                report = self.compliance.scan_post(text_to_check, self.company_info)
+                
+                if report['score'] >= 80:
+                    # Pass!
+                    break
+                else:
+                    # Fail - prepare feedback for next loop
+                    issues = "; ".join(report['issues'])
+                    critique = f"GUARDRAIL ALERT (Score {report['score']}): {issues}. Please strictly adhere to brand guidelines."
+                    if attempt == max_retries:
+                        print("  [Warning] Max retries reached. Using best effort.")
             
             # B. Art Director (Visuals)
             # Use LinkedIn draft as basis for visual
@@ -208,3 +248,67 @@ class ContentGenerator:
             return json.loads(clean)
         except:
             return []
+
+    def analyze_image_style(self, image_path):
+        """
+        Uses Gemini Vision to extract a style prompt from an image.
+        """
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            # Load image
+            import PIL.Image
+            img = PIL.Image.open(image_path)
+            
+            prompt = """
+            Analyze this image and describe its visual style in a way that can be used as an AI image generation prompt.
+            Focus on:
+            1. Art style (e.g. minimalist vector, cyberpunk 3D, oil painting)
+            2. Lighting and Color Palette
+            3. Composition and Camera Angle
+            4. Mood/Atmosphere
+            
+            Output ONLY the comma-separated description string. Keep it concise (under 50 words).
+            """
+            
+            resp = model.generate_content([prompt, img])
+            return resp.text.strip()
+        except Exception as e:
+            print(f"Error analyzing image: {e}")
+            return "Visual style extraction failed."
+
+    def generate_tailored_image_prompt(self, post_content, style_description):
+        """
+        Generates a specific prompt combining the post's topic and the template's style.
+        """
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            prompt = f"""
+            Create a highly detailed AI image generation prompt.
+            
+            CONTEXT (The Post):
+            "{post_content}"
+            
+            VISUAL STYLE (The Template):
+            "{style_description}"
+            
+            TASK:
+            Combine the core subject from the Context with the Visual Style.
+            describe the SUBJECT acting out the context, but strictly adhering to the VISUAL STYLE.
+            
+            Output ONLY the final prompt string.
+            """
+            
+            resp = model.generate_content(prompt)
+            # Log usage
+            try:
+                usage = resp.usage_metadata
+                if usage:
+                     self.db.log_usage("ContentGenerator", "gemini-2.0-flash-exp", usage.prompt_token_count, usage.candidates_token_count, client_id=self.client_id)
+            except: pass
+            
+            return resp.text.strip()
+        except Exception as e:
+            print(f"Error tailoring prompt: {e}")
+            return f"{post_content}. Style: {style_description}"

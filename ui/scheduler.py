@@ -25,8 +25,13 @@ def show_event_manager(event_data):
     # Fallback ID retrieval: resourceId (if resource view), id, publicId
     post_id = str(event_data.get('resourceId') or event_data.get('id') or event_data.get('publicId'))
     
-    # Init Visual State for this Dialog
-    if 'temp_visual_path' not in st.session_state:
+    # Init Visual State for this Dialog (Fix Sticky State Bug)
+    # We track which post is currently loaded. If it changes, we reset the temp path.
+    if 'editing_post_id' not in st.session_state or st.session_state.editing_post_id != post_id:
+        st.session_state.editing_post_id = post_id
+        st.session_state.temp_visual_path = props.get('image') # Load fresh
+    elif 'temp_visual_path' not in st.session_state:
+        # Fallback if key missing for some reason
         st.session_state.temp_visual_path = props.get('image')
 
     # 1. Header with Visuals
@@ -35,7 +40,7 @@ def show_event_manager(event_data):
     with c1:
         current_img = st.session_state.temp_visual_path
         if current_img:
-            st_image_robust(current_img, caption="Current Visual", use_container_width=True)
+            st_image_robust(current_img, caption="Current Visual")
         else:
             st.info("No Image")
 
@@ -220,6 +225,9 @@ def render_scheduler_page():
     # --- TABS: The Two Brains ---
     tab_schedule, tab_vault, tab_analytics = st.tabs(["🗓️ Pro Calendar", "🔐 Asset Vault", "📈 Analytics"])
 
+    # Identfy Active Client
+    current_client_id = st.session_state.get('current_client_id', 1)
+
     # ==========================
     # TAB 1: PRO CALENDAR
     # ==========================
@@ -232,8 +240,8 @@ def render_scheduler_page():
             st.subheader("Drafts")
             st.caption("Drag not supported yet, Click to Schedule.")
             
-            # Fetch "Draft" status posts
-            all_p = st.session_state.db.get_all_posts()
+            # Fetch "Draft" status posts (Client Scoped)
+            all_p = st.session_state.db.get_all_posts(client_id=current_client_id)
             drafts = [p for p in all_p if p.get('status', '').lower() == 'draft']
             
             if drafts:
@@ -248,6 +256,13 @@ def render_scheduler_page():
                              topic = content.split('\n')[0][:30] + "..."
                         
                         st.markdown(f"**{topic}**")
+                        
+                        # Show Visual Thumbnail
+                        img_path = d.get('image_path')
+                        if img_path:
+                            st_image_robust(img_path, width=100)
+                        else:
+                             st.caption("No Visual")
                         
                         # Scheduling Actions
                         col_s1, col_s2 = st.columns([1, 1])
@@ -294,7 +309,7 @@ def render_scheduler_page():
         # --- RIGHT: THE PRO CALENDAR ---
         with col_cal:
             # 1. Fetch Events
-            events = get_calendar_events()
+            events = get_calendar_events(client_id=current_client_id)
             
             # 2. Configure Calendar Options (FullCalendar.js props)
             calendar_options = {

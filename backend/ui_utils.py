@@ -32,11 +32,17 @@ def st_image_robust(image_path, caption=None, width=None):
     Renders an image robustly using Base64.
     """
     if str(image_path).startswith(("http://", "https://")):
-        st.image(image_path, caption=caption, width=width)
+        if width:
+            st.image(image_path, caption=caption, width=width)
+        else:
+            st.image(image_path, caption=caption)
         return
 
     b64_data = get_base64_img(image_path)
     if b64_data:
-        st.image(b64_data, caption=caption, width=width)
+        if width:
+            st.image(b64_data, caption=caption, width=width)
+        else:
+            st.image(b64_data, caption=caption)
     else:
         st.info("Image not found (Simulator/Placeholder)")

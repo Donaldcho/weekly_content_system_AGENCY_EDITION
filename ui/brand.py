@@ -5,6 +5,8 @@ from backend.brand_analyzer import BrandAnalyzer
 from backend.vault import VaultManager
 from project_config import Config
 from backend.ui_utils import st_image_robust
+from backend.template_manager import TemplateManager
+from backend.content_generator import ContentGenerator # Added
 
 def render_brand_page():
     # --- SETUP & STATE ---
@@ -12,9 +14,42 @@ def render_brand_page():
         st.session_state.analyzer = BrandAnalyzer()
     
     vault_styles = VaultManager(Config().ASSETS_DIR + "/vault")
+    # Initialize Template Manager with DB
+    template_manager = TemplateManager(st.session_state.db, vault_styles)
+    
+    st.header("🧬 Brand Identity & Knowledge Base")
+    st.caption("Define your brand's DNA. The AI uses this to generate on-brand content.")
+    
+    # Client Context
+    current_client_id = st.session_state.get('current_client_id', 1)
+
+    # --- 1. LOAD DATA ---
+    current_settings = st.session_state.db.get_brand_settings(client_id=current_client_id)
+    if isinstance(current_settings, str): # Legacy fallback
+         try: current_settings = json.loads(current_settings)
+         except: current_settings = {}
+         
+    # --- 2. MAIN TABS ---
+    # --- 2. MAIN TABS ---
+    # Tabs are defined below to wrap the main content area
+
+    
+    # ... (Keep Tabs 1-4 existing logic - re-inserting simplified for replacement target matching if needed, 
+    # but I will target specific blocks to avoid huge replacement)
+    
+    # actually I need to replace the whole beginning to inject the import properly, 
+    # or I can use multi-replace.
+    # Let's try replacing just the top imports and setup, then append the tab logic.
+    # But the tabs are defined in a 'with' block usually? No, st.tabs returns list.
+    
+    # Wait, I need to see where 'tabs' variable is defined in the original file.
+    # It was not shown in the previous view (lines 1-15).
+    # I need to find the `tab_core, ... = st.tabs([...])` line.
+
     
     # Load settings with defaults
-    current_settings = st.session_state.db.get_brand_settings()
+    current_client_id = st.session_state.get('current_client_id', 1)
+    current_settings = st.session_state.db.get_brand_settings(client_id=current_client_id)
     if isinstance(current_settings, str): current_settings = {} # Handle legacy
     
     # Default Defaults
@@ -54,7 +89,7 @@ def render_brand_page():
                             "s_humor": int(voice_vec.get("humor", 0.5) * 100),
                             "s_edgy": int(voice_vec.get("edginess", 0.5) * 100)
                         })
-                        st.session_state.db.save_brand_settings(current_settings)
+                        st.session_state.db.save_brand_settings(current_settings, client_id=current_client_id)
                         st.success("Brand extracted!")
                         st.rerun()
                     else:
@@ -74,7 +109,7 @@ def render_brand_page():
                             voice = res.get("voice", {})
                             current_settings["target_audience"] = aud.get("persona", "")
                             current_settings["tone"] = ", ".join(voice.get("adjectives", []))
-                            st.session_state.db.save_brand_settings(current_settings)
+                            st.session_state.db.save_brand_settings(current_settings, client_id=current_client_id)
                             st.success("Tone extracted!")
                             st.rerun()
                     except Exception as e:
@@ -83,11 +118,12 @@ def render_brand_page():
     st.markdown("---")
 
     # --- MAIN WORKSPACE (TABS) ---
-    tab_id, tab_voice, tab_visual, tab_kb = st.tabs([
+    tab_id, tab_voice, tab_visual, tab_kb, tab_templates = st.tabs([
         "1. Who Are We? (Identity)", 
         "2. How We Sound (Voice)", 
         "3. How We Look (Visuals)", 
-        "4. Knowledge Base"
+        "4. Knowledge Base",
+        "5. 🖼️ Prompt Templates"
     ])
 
     # === TAB 1: IDENTITY ===
@@ -219,12 +255,93 @@ def render_brand_page():
                     st.success("Brain Updated!")
                     st.json(rep)
 
+    # === TAB 5: PROMPT TEMPLATES ===
+    with tab_templates:
+        st.info("🖼️ Define standard visual prompts or patterns for this brand.")
+        
+        # 1. New Template Form
+        if 'new_tpl_desc' not in st.session_state: st.session_state.new_tpl_desc = ""
+        
+        with st.expander("➕ Add New Template", expanded=False):
+            # We need to use session state for the description to allow auto-fill update
+            
+            # We move the uploader OUTSIDE the form so we can access the file immediately for extraction
+            t_img = st.file_uploader("Reference Image (Optional)", type=['png', 'jpg'])
+            
+            # Helper for Extraction (Now visible immediately after upload)
+            if t_img:
+                if st.button("✨ Extract Style from Image"):
+                    with st.spinner("Analyzing visual DNA..."):
+                        # Save temp
+                        temp_path = os.path.join(Config().ASSETS_DIR, "temp_style_analysis.png")
+                        with open(temp_path, "wb") as f: f.write(t_img.getbuffer())
+                        
+                        # Analyze
+                        gen = ContentGenerator(client_id=current_client_id)
+                        style_desc = gen.analyze_image_style(temp_path)
+                        
+                        st.session_state.new_tpl_desc = style_desc
+                        st.toast("Style extracted! Check description.", icon="🧠")
+                        st.rerun()
+
+            with st.form("new_tpl_form"):
+                t_name = st.text_input("Template Name", placeholder="e.g. LinkedIn Carousel Style")
+                
+                t_desc = st.text_area("Prompt / Description", value=st.session_state.new_tpl_desc, placeholder="Describe the visual style, camera angle, lighting...", height=100)
+                
+                if st.form_submit_button("Save Template"):
+                    if t_name and t_desc:
+                        template_manager.add_template(t_name, t_desc, t_img, client_id=current_client_id)
+                        st.session_state.new_tpl_desc = "" # Clear
+                        st.success(f"Added template: {t_name}")
+                        st.rerun()
+                    else:
+                        st.error("Name and Description required.")
+            
+
+
+        # 2. List Templates
+        templates = template_manager.get_templates(client_id=current_client_id)
+        
+        if templates:
+            st.divider()
+            st.markdown(f"**Saved Templates ({len(templates)})**")
+            
+            for tpl in templates:
+                with st.container():
+                    c_img, c_info, c_act = st.columns([1, 3, 1])
+                    with c_img:
+
+                        if tpl.get('image'):
+                            # Styles are saved in a sibling 'styles' folder by VaultManager
+                            # We can rely on VaultManager helper or manual construction
+                            # Manual: styles_dir is sibling to vault
+                            styles_dir = os.path.join(Config().ASSETS_DIR, "styles")
+                            img_path = os.path.join(styles_dir, tpl['image'])
+                            
+                            if os.path.exists(img_path):
+                                st.image(img_path, use_container_width=True)
+                            else:
+                                st.warning("Img Missing")
+                        else:
+                             st.markdown("🖼️")
+                    with c_info:
+                        st.subheader(tpl['name'])
+                        st.caption(tpl['description'])
+                    with c_act:
+                        if st.button("🗑️", key=f"del_{tpl['id']}", help="Delete Template"):
+                            template_manager.delete_template(tpl['id'], client_id=current_client_id)
+                            st.rerun()
+                    st.divider()
+        else:
+            st.caption("No templates found. Add one above!")
+
     # --- SAVE ACTION ---
     st.markdown("---")
     col_save, col_clear = st.columns([4, 1])
     with col_save:
         if st.button("💾 Save Brand Profile", type="primary", use_container_width=True):
-            st.session_state.db.save_brand_settings(current_settings)
+            st.session_state.db.save_brand_settings(current_settings, client_id=current_client_id)
             st.balloons()
             st.toast("Brand DNA Saved Successfully!", icon="🧬")
             
