@@ -19,11 +19,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from project_config import Config
 from backend.database import Database
 from backend.rag import RAGEngine
-from backend.agents.strategist import StrategistAgent
-from backend.agents.creator import CreatorAgent
+from backend.adk.main import MarketingAgency
 from backend.agents.art_director import ArtDirectorAgent
 from backend.agents.reviewer import ReviewerAgent
 from backend.compliance_guard import ComplianceGuard
+from PIL import Image, ImageDraw, ImageFont # For fallback generation
+import random
 
 class ContentGenerator:
     def __init__(self, client_id=1):
@@ -45,8 +46,8 @@ class ContentGenerator:
         
         # Initialize Agents
         print("Initializing Agents...")
-        self.strategist = StrategistAgent()
-        self.creator = CreatorAgent()
+        self.agency = MarketingAgency()
+        # Legacy agents kept for visuals/review until fully ported
         self.art_director = ArtDirectorAgent()
         self.reviewer = ReviewerAgent()
         self.compliance = ComplianceGuard()
@@ -110,15 +111,16 @@ class ContentGenerator:
             if docs:
                  context_str = "\n".join([f"[{d['filename']}] {d['content']}" for d in docs])
         
-        # 1. STRATEGIST: Plan the Week
+        # 1. STRATEGIST: Plan the Week (ADK Version)
         print("Agent: Strategist planning...")
         if progress_callback: progress_callback("🧠 Agent: Strategist designing weekly plan...")
-        week_plan = self.strategist.plan_week(
+        
+        # New ADK Strategist returns { "strategy_analysis": ..., "week_plan": [...] }
+        strategy_result = self.agency.create_strategy(
             topic, 
-            self.company_info if isinstance(self.company_info, dict) else {},
-            context=f"{trends}\n{context_str}",
-            campaign_type=campaign_type
+            self.company_info if isinstance(self.company_info, dict) else {}
         )
+        week_plan = strategy_result.get("week_plan", [])
         
         # SAFETY: Ensure week_plan is a list of dicts
         if isinstance(week_plan, dict):
@@ -152,7 +154,7 @@ class ContentGenerator:
                 if attempt > 0:
                      print(f"  [Attempt {attempt+1}] Improving draft based on critique...")
                 
-                drafts = self.creator.draft_content(day_item, self.company_info, critique)
+                drafts = self.agency.generate_day_content(day_item, self.company_info, critique)
                 if not isinstance(drafts, dict): drafts = {}
                 
                 # Check Compliance (Guardrail)
@@ -211,7 +213,7 @@ class ContentGenerator:
             "angle": f"Talk about {topic}"
         }
         
-        drafts = self.creator.draft_content(fake_plan, "Professional")
+        drafts = self.agency.generate_day_content(fake_plan, "Professional")
         
         # Return specific platform draft
         if platform.lower() == "linkedin":
@@ -280,35 +282,106 @@ class ContentGenerator:
     def generate_tailored_image_prompt(self, post_content, style_description):
         """
         Generates a specific prompt combining the post's topic and the template's style.
+        Uses externalizable prompt templates from PromptRegistry.
         """
         try:
+            from backend.prompt_registry import PromptRegistry
+            registry = PromptRegistry()
+            
             model = genai.GenerativeModel('gemini-2.0-flash-exp')
             
-            prompt = f"""
-            Create a highly detailed AI image generation prompt.
-            
-            CONTEXT (The Post):
-            "{post_content}"
-            
-            VISUAL STYLE (The Template):
-            "{style_description}"
-            
-            TASK:
-            Combine the core subject from the Context with the Visual Style.
-            describe the SUBJECT acting out the context, but strictly adhering to the VISUAL STYLE.
-            
-            Output ONLY the final prompt string.
-            """
+            # Fetch from JSON config
+            prompt = registry.get(
+                "smart_style_generator", 
+                post_content=post_content, 
+                style_description=style_description
+            )
             
             resp = model.generate_content(prompt)
-            # Log usage
-            try:
-                usage = resp.usage_metadata
-                if usage:
-                     self.db.log_usage("ContentGenerator", "gemini-2.0-flash-exp", usage.prompt_token_count, usage.candidates_token_count, client_id=self.client_id)
-            except: pass
-            
             return resp.text.strip()
-        except Exception as e:
-            print(f"Error tailoring prompt: {e}")
+        except:
             return f"{post_content}. Style: {style_description}"
+
+    def generate_image(self, prompt, filename_prefix="generated"):
+        """
+        Generates an image using Gemini Imagen 3 (or fallback Mock).
+        Returns the local file path of the saved image.
+        """
+        print(f"Generating image for: {prompt[:50]}...")
+        save_dir = os.path.join(Config().ASSETS_DIR, "generated")
+        os.makedirs(save_dir, exist_ok=True)
+        timestamp = int(time.time())
+        filename = f"{filename_prefix}_{timestamp}.png"
+        filepath = os.path.join(save_dir, filename)
+        
+        # 1. Try Real AI Generation
+        try:
+            # Check availability dynamically to avoid crash if lib is old
+            if hasattr(genai, 'ImageGenerationModel'):
+                model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+                response = model.generate_images(prompt=prompt, number_of_images=1)
+                
+                if response and response.images:
+                    image = response.images[0]
+                    image.save(filepath)
+                    return filepath
+            else:
+                 print("WARN: ImageGenerationModel not found. Using Mock.")
+
+        except Exception as e:
+            print(f"Image Gen Error (Falling back to Mock): {e}")
+            
+        # 2. Fallback: Mock Image Generation (Robustness)
+        return self._create_mock_image(prompt, filepath)
+
+    def _create_mock_image(self, prompt, filepath):
+        """
+        Generates a placeholder image with the prompt text.
+        """
+        try:
+            width, height = 512, 512
+            # Random dark background color
+            bg_color = (random.randint(20, 50), random.randint(20, 50), random.randint(50, 80))
+            img = Image.new('RGB', (width, height), color=bg_color)
+            d = ImageDraw.Draw(img)
+            
+            # Draw basic pattern
+            for _ in range(10):
+                x_a = random.randint(0, width)
+                y_a = random.randint(0, height)
+                x_b = random.randint(0, width)
+                y_b = random.randint(0, height)
+                # Ensure x1 < x2, y1 < y2
+                x1, x2 = sorted([x_a, x_b])
+                y1, y2 = sorted([y_a, y_b])
+                
+                fill = (random.randint(50, 100), random.randint(50, 100), random.randint(100, 150), 100)
+                d.ellipse([x1, y1, x2, y2], fill=fill)
+                
+            # Text
+            try:
+                # Try standard fonts first
+                font = ImageFont.truetype("arial.ttf", 20)
+                header_font = ImageFont.truetype("arial.ttf", 40)
+            except:
+                # Fallback to internal default
+                print("Using default PIL font")
+                font = ImageDraw.load_default()
+                header_font = font
+                
+            # Centered Text (Simplified positioning)
+            d.text((width/2, 50), "STYLE PREVIEW", fill=(255, 255, 255), anchor="mm", font=header_font)
+            
+            # Wrap text manually if needed or just show substring
+            # Simple substring for robustness
+            clean_prompt = prompt.replace("\n", " ")[:100] + "..."
+            d.text((width/2, height/2), clean_prompt, fill=(200, 200, 200), anchor="mm", font=font)
+            
+            img.save(filepath)
+            print(f"Mock image saved to {filepath}")
+            return filepath
+        except Exception as e:
+            print(f"Mock Gen Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None

@@ -280,11 +280,26 @@ def render_generate_page():
                     st.markdown("---")
                     st.markdown("#### 🍌 Nano Banana Vision")
                     
+                    # TIER SELECTION (Based on User Specs)
+                    # "Nano Pro" vs "Nano" (Flash)
+                    nb_tier = st.radio(
+                        "Engine Class",
+                        ["Nano Pro (Best)", "Nano (Fast)"],
+                        horizontal=True,
+                        help="Pro = Gemini 3.0 Pro | Nano = Gemini 2.5 Flash",
+                        key=f"nb_tier_{i}"
+                    )
+                    
+                    # Map UI selection to Backend Tier
+                    # "Nano Pro (Best)" -> "Pro"
+                    # "Nano (Fast)" -> "Flash" (which maps to "Nano" definition)
+                    selected_tier = "Pro" if "Pro" in nb_tier else "Flash"
+                    
                     # Visual Source Selection
                     visual_source = st.radio(
                         "Source", 
-                        ["Generate (Prompt)", "Use Template", "Vault (Saved Designs)", "Upload File (Bypass)", "Style Reference"],
-                        horizontal=True,
+                        ["Generate (Smart Style)", "Generate (Prompt)", "Use Template", "Vault (Saved Designs)", "Upload File (Bypass)", "Style Reference"],
+                        horizontal=True, # Allow wrapping
                         key=f"viz_src_{i}"
                     )
                     
@@ -337,11 +352,87 @@ def render_generate_page():
                                 else:
                                     st.warning(f"Template image missing at {t_img_path}")
                         else:
+                            st.warning("No templates found. Go to Brand Identity to create some.")
                             st.warning("No templates found. Create one in Brand Identity.")
                             final_prompt = st.text_area("Prompt", value=final_prompt, key=f"img_p_fallback_{i}")
 
                     elif visual_source == "Generate (Prompt)":
                         final_prompt = st.text_area("Prompt", value=final_prompt, height=80, key=f"img_p_{i}")
+                    
+                    elif visual_source == "Generate (Smart Style)":
+                        # Smart Visual Agent Interface
+                        defaults = ["Minimalist", "Cyberpunk", "Editorial", "Organic", "Corporate"]
+                        
+                        # Fetch User Styles (Handle both dicts and legacy strings)
+                        style_data = st.session_state.brand_info.get("visual_styles", {})
+                        user_keys = list(style_data.keys())
+                        
+                        # Merge and Sort
+                        presets = sorted(list(set(defaults + user_keys)))
+                        
+                        sel_style = st.selectbox("Select Visual Style", presets, key=f"v_style_{i}")
+                        
+                        # --- GALLERY PREVIEW ---
+                        selected_style_info = style_data.get(sel_style)
+                        current_style_prompt = ""
+                        
+                        if isinstance(selected_style_info, dict):
+                            # Show Preview
+                            prev_img = selected_style_info.get("preview_image")
+                            if prev_img and os.path.exists(prev_img):
+                                st.image(prev_img, caption="Style Identity", width=200)
+                            
+                            current_style_prompt = selected_style_info.get("prompt", "")
+                            
+                            # Show Variants
+                            variants = selected_style_info.get("variants", [])
+                            if variants:
+                                v_names = [v['name'] for v in variants]
+                                v_names.insert(0, "Default")
+                                sel_variant = st.selectbox("Style Variant", v_names, key=f"v_var_{i}")
+                                
+                                if sel_variant != "Default":
+                                    # Find prompt modifier
+                                    for v in variants:
+                                        if v['name'] == sel_variant:
+                                            # Append modifier
+                                            current_style_prompt += f" {v['prompt']}"
+                        
+                        else:
+                            # Legacy string or Default
+                            if isinstance(selected_style_info, str):
+                                current_style_prompt = selected_style_info
+                        
+                        # Pass this specifically constructed prompt or key to agent
+                        # We need to trick the agent: if we have a custom constructed prompt (with variants),
+                        # we should pass that as a "Custom" requested style or override the brand_info temporarily.
+                        
+                        post_title = day_data.get('topic') or "New Post"
+                        
+                        if st.button("✨ Draft Visual Prompt", key=f"vis_agent_{i}"):
+                            with st.spinner(f"Agent designing {sel_style} visual..."):
+                                # Ensure Agency Init
+                                if 'agency' not in st.session_state:
+                                    from backend.adk.main import MarketingAgency
+                                    st.session_state.agency = MarketingAgency()
+                                
+                                # Construct override brand info if we have variants
+                                call_brand_info = st.session_state.brand_info.copy()
+                                if current_style_prompt:
+                                     if "visual_styles" not in call_brand_info: call_brand_info["visual_styles"] = {}
+                                     # Force the exact computed prompt for this key
+                                     call_brand_info["visual_styles"][sel_style] = current_style_prompt
+                                    
+                                res = st.session_state.agency.generate_visual(
+                                    day_data.get('topic', 'General'), 
+                                    post_title, 
+                                    sel_style, 
+                                    call_brand_info
+                                )
+                                day_data['image_prompt'] = res.get('image_prompt', '')
+                                st.rerun()
+                        
+                        final_prompt = st.text_area("Agent Prompt", value=day_data.get('image_prompt', ''), height=100, key=f"img_p_smart_{i}")
                     
                     elif visual_source == "Vault (Saved Designs)":
                         bypass_generation = True
@@ -418,16 +509,18 @@ def render_generate_page():
                         btn_label = regen_label if has_existing else default_label
                         
                         if st.button(btn_label, key=f"btn_img_{i}", type="primary" if not has_existing else "secondary"):
-                            with st.spinner("🎨 Nano Banana is painting..."):
+                            with st.spinner(f"🎨 Nano Banana ({selected_tier}) is painting..."):
                                 if is_carousel and 'carousel_slides' in day_data:
                                     for idx, slide in enumerate(day_data['carousel_slides']):
                                         p_text = slide.get('image_prompt', '')
-                                        img_path = st.session_state.image_gen.generate_image(p_text, reference_image_path=ref_image_path)
-                                        if img_path: slide['image_path'] = img_path
+                                        # Use selected_tier
+                                        img_path = st.session_state.image_gen.generate_image(p_text, reference_image_path=ref_image_path, tier=selected_tier)
+                                        slide['image_path'] = img_path
                                     st.toast("Carousel Visuals Created!", icon="🍌")
                                     st.rerun()
                                 else:
-                                    img_path = st.session_state.image_gen.generate_image(final_prompt, reference_image_path=ref_image_path)
+                                    # Use selected_tier
+                                    img_path = st.session_state.image_gen.generate_image(final_prompt, reference_image_path=ref_image_path, tier=selected_tier)
                                     if img_path: 
                                         day_data['image_path'] = img_path
                                         st.toast("Visual Masterpiece Created!", icon="🍌")

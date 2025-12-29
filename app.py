@@ -49,6 +49,12 @@ elif not hasattr(st.session_state.db, 'log_usage'):
 if 'brand_info' not in st.session_state:
     st.session_state.brand_info = st.session_state.db.get_brand_settings()
 
+# Initialize Marketing Agency (ADK)
+if 'agency' not in st.session_state:
+    from backend.adk.main import MarketingAgency
+    print("Initializing Marketing Agency...")
+    st.session_state.agency = MarketingAgency()
+
 # --- SIDEBAR NAV ---
 with st.sidebar:
     # --- RBAC USER SWITCHER ---
@@ -98,6 +104,7 @@ with st.sidebar:
             "📡 The Sentinel"
         ],
         "🎨 Creative Studio": [
+            "🚀 Launchpad",
             "✨ Content Studio",
             "🎬 AI Video Director",
             "🎨 Visual Editor",
@@ -190,6 +197,10 @@ elif selected_page == "💰 CRM & ROI":
 elif selected_page == "💬 Community Central":
     from ui.inbox import render_inbox_page
     render_inbox_page()
+
+elif selected_page == "🚀 Launchpad":
+    from ui.launchpad import render_launchpad_page
+    render_launchpad_page()
 
 elif selected_page == "✨ Content Studio": 
     render_generate_page()

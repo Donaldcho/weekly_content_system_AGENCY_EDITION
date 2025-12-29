@@ -6,7 +6,10 @@ from backend.vault import VaultManager
 from project_config import Config
 from backend.ui_utils import st_image_robust
 from backend.template_manager import TemplateManager
-from backend.content_generator import ContentGenerator # Added
+from backend.content_generator import ContentGenerator
+from backend.adk.main import MarketingAgency # For Visual Agent
+from backend.nano_banana import NanoBanana # For Preview Generation
+import time # Ensure this is present for sleep calls
 
 def render_brand_page():
     # --- SETUP & STATE ---
@@ -216,13 +219,150 @@ def render_brand_page():
                 st.success("Watermark updated!")
 
         with c_vis2:
-            st.markdown("#### 🖌️ Art Direction")
-            current_settings["visual_guidelines"] = st.text_area(
-                "Visual Style Prompt", 
-                value=current_settings.get("visual_guidelines", ""),
-                height=150,
-                placeholder="e.g. Minimalist, flat vector art, corporate memphis style, blue and white color scheme..."
-            )
+            st.markdown("#### 🖌️ Art Direction (Style DNA)")
+            
+            # Ensure visual_styles dict exists
+            if "visual_styles" not in current_settings:
+                current_settings["visual_styles"] = {}
+                
+            # Style Editor
+            presets = ["Minimalist", "Cyberpunk", "Editorial", "Organic", "Corporate"]
+            existing_styles = list(current_settings["visual_styles"].keys())
+            
+            # Combine and unique, plus "Create New" option
+            all_styles_options = sorted(list(set(presets + existing_styles)))
+            all_styles_options.insert(0, "➕ Create New Style")
+            
+            # Selector
+            edit_style = st.selectbox("Select Style to Train", all_styles_options, key="style_edit_sel")
+            
+            target_style_key = edit_style
+            
+            if edit_style == "➕ Create New Style":
+                new_style_name = st.text_input("New Style Name", placeholder="e.g. Retro Wave 80s")
+                if new_style_name:
+                    target_style_key = new_style_name.strip()
+                else:
+                    target_style_key = None # Block editing until name provided
+            
+            if target_style_key:
+                # Get current value (handle both legacy string and new dict)
+                raw_val = current_settings["visual_styles"].get(target_style_key, "")
+                
+                # Normalize to object
+                if isinstance(raw_val, dict):
+                    current_style_obj = raw_val
+                    current_prompt = current_style_obj.get("prompt", "")
+                else:
+                    current_style_obj = {"prompt": str(raw_val)}
+                    current_prompt = str(raw_val)
+                
+                # Layout: Preview Image | Editor
+                col_sty_img, col_sty_edit = st.columns([1, 2])
+                
+                with col_sty_img:
+                    preview_path = current_style_obj.get("preview_image")
+                    if preview_path and os.path.exists(preview_path):
+                        st.image(preview_path, caption=f"Preview: {target_style_key}", width="stretch")
+                    else:
+                        st.info("No Preview Image")
+                        
+                with col_sty_edit:
+                    new_promt = st.text_area(
+                        f"Prompt Guidelines for '{target_style_key}'", 
+                        value=current_prompt,
+                        height=150,
+                        placeholder=f"Describe exactly how {target_style_key} looks for your brand..."
+                    )
+
+                # --- VARIANTS ---
+                with st.expander("🧩 Style Variants"):
+                    variants = current_style_obj.get("variants", [])
+                    
+                    # Add Variant
+                    c_v1, c_v2, c_v3 = st.columns([2, 3, 1])
+                    v_name = c_v1.text_input("Name", key=f"v_n_{target_style_key}")
+                    v_p = c_v2.text_input("Modifier", key=f"v_p_{target_style_key}")
+                    if c_v3.button("Add", key=f"v_btn_{target_style_key}"):
+                        if v_name and v_p:
+                            variants.append({"name": v_name, "prompt": v_p})
+                            current_style_obj["variants"] = variants
+                            current_style_obj["prompt"] = new_promt # Sync
+                            current_settings["visual_styles"][target_style_key] = current_style_obj
+                            st.rerun()
+                    
+                    if variants:
+                        for v in variants:
+                            st.caption(f"• **{v['name']}**: {v['prompt']}")
+
+                if new_promt != current_prompt:
+                    current_style_obj["prompt"] = new_promt
+                    current_style_obj["variants"] = variants
+                    current_settings["visual_styles"][target_style_key] = current_style_obj
+                    st.caption("⚠️ Change pending save (Click 'Save Brand Profile' below)")
+                
+                # --- VISUALIZATION / TEST ---
+                if st.button(f"🎨 Visualize Style: {target_style_key}", help="Generate a test image to see how this style looks."):
+                    if not new_promt:
+                        st.error("Please define the style prompt first.")
+                    else:
+                        with st.spinner(f"Agent designing & rendering '{target_style_key}' preview..."):
+                            # 1. Init Agency & Generator
+                            agency = MarketingAgency()
+                            gen = ContentGenerator(client_id=current_client_id)
+                            
+                            # 2. Mock Brand Info
+                            test_brand_info = current_settings.copy()
+                            # Ensure we pass the simplified dict structure if the agent expects it, 
+                            # or just pass the full object if we updated the agent. 
+                            # We updated agent to handle dicts.
+                            if "visual_styles" not in test_brand_info: test_brand_info["visual_styles"] = {}
+                            
+                            # Pass the temp object
+                            temp_style_obj = current_style_obj.copy()
+                            temp_style_obj["prompt"] = new_promt
+                            test_brand_info["visual_styles"][target_style_key] = temp_style_obj
+                            
+                            # 3. Generate Prompt (Agent)
+                            vis_res = agency.generate_visual(
+                                topic="Visual Identity Preview", 
+                                title="PREVIEW", 
+                                style_preset=target_style_key, 
+                                brand_info=test_brand_info
+                            )
+                            smart_prompt = vis_res.get('image_prompt', '')
+                            
+                            
+                            if smart_prompt:
+                                # 4. Generate Image (Switched to NanoBanana / Gemini 2.0)
+                                st.caption(f"**Agent Generated Prompt:**\n*{smart_prompt}*")
+                                
+                                # Use NanoBanana (Pro Tier)
+                                nb = NanoBanana(tier="Pro")
+                                # Filename only, path handled inside
+                                fname = "preview_style_" + target_style_key.replace(" ", "_").lower() + ".png"
+                                # NanoBanana expects prompt, optional filename. It returns full path.
+                                img_path = nb.generate_image(smart_prompt, fname)
+                                
+                                # 5. Display & Save
+                                if img_path and os.path.exists(img_path):
+                                    # Fix: Streamlit new version requires explicit string or int, None is invalid.
+                                    # 'stretch' mimics use_container_width=True
+                                    st.image(img_path, caption=f"Style: {target_style_key}", width="stretch") 
+                                    
+                                    # Update Preview in Object
+                                    current_style_obj["preview_image"] = img_path
+                                    current_style_obj["prompt"] = new_promt
+                                    current_settings["visual_styles"][target_style_key] = current_style_obj
+                                    
+                                    st.success("Preview generated! Saving as Style Cover Image...")
+                                    st.session_state.db.save_brand_settings(current_settings, client_id=current_client_id)
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error("Image generation failed.")
+                            else:
+                                st.error("Agent failed to generate prompt.")
             
             # Preview Watermark
             logo_path = os.path.join(Config().ASSETS_DIR, "brand_logo.png")

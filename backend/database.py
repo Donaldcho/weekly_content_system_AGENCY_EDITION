@@ -264,20 +264,36 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("SELECT content FROM client_brand_settings WHERE client_id = ?", (client_id,))
             row = cursor.fetchone()
-            if row:
-                content = row[0]
-                try:
-                    return json.loads(content)
-                except:
-                    return content
             # Default fallback if empty
-            return {
-                "name": "New Client",
-                "industry": "General",
-                "tone": "Professional",
-                "mission": "To be defined.",
-                "colors": []
-            }
+            if not row:
+                return {
+                    "name": "New Client",
+                    "industry": "General",
+                    "tone": "Professional",
+                    "mission": "To be defined.",
+                    "colors": [],
+                    "visual_styles": {}
+                }
+
+            content = row[0]
+            try:
+                data = json.loads(content)
+                # --- MIGRATION: Convert old string styles to dicts ---
+                if "visual_styles" in data:
+                    migrated_styles = {}
+                    for k, v in data["visual_styles"].items():
+                        if isinstance(v, str):
+                            # Convert string prompt to object
+                            migrated_styles[k] = {
+                                "prompt": v,
+                                "preview_image": None
+                            }
+                        else:
+                            migrated_styles[k] = v
+                    data["visual_styles"] = migrated_styles
+                return data
+            except:
+                return {} # Corrupt data fallback
 
     def save_brand_settings(self, content, client_id=1):
         # If content is a dict, serialize it

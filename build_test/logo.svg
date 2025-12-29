@@ -1,0 +1,5 @@
+<svg viewBox="0 0 300 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="300" height="100" fill="#000000"/>
+<path d="M30 20L50 50L30 80V20ZM55 20L75 50L55 80V20Z" fill="#6366F1"/>
+<text x="90" y="60" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#6366F1">VelocityNet</text>
+</svg>

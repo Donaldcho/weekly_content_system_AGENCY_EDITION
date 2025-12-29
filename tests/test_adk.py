@@ -20,6 +20,20 @@ def test_marketing_agency():
     
     if len(results) > 0:
         print("\n[PASS] Agency successfully ideated domains.")
+        
+    # --- STRATEGY TEST ---
+    print(f"\nTesting Strategy Creation for: '{topic}'")
+    brand = {
+        "name": "BeanBloom",
+        "mission": "Deliver freshly roasted, ethically sourced coffee to remote workers.",
+        "target_audience": "Digital Nomads, 25-35"
+    }
+    strategy = agency.create_strategy(topic, brand)
+    print("\nStrategy Results (Snippet):")
+    print(json.dumps(strategy, indent=2)[:500] + "...")
+    
+    if strategy.get("strategy_analysis"):
+        print("\n[PASS] Agency successfully created Personas & SWOT.")
     else:
         print("\n[FAIL] No domains returned.")
 

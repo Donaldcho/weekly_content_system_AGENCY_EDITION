@@ -53,7 +53,7 @@ class BaseAgent:
                 if "429" in err_str or "quota" in err_str.lower():
                     if attempt < max_retries - 1:
                         import time
-                        print(f"⚠️ Quota hit. Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
+                        print(f"[Warning] Quota hit. Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
                         time.sleep(retry_delay)
                         retry_delay *= 2 # Exponential backoff
                         continue
