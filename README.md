@@ -4,6 +4,10 @@
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://streamlit.io)
 [![Model: Gemini 2.0](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)](https://deepmind.google/technologies/gemini/)
 
+> [!WARNING]
+> **Status: Under Active Development**
+> This project is currently in **Beta**. Features such as the *Video Director* and *Sentinel Agent* are experimental and may undergo significant changes. Use with caution in production environments.
+
 **Deviceterra Enterprise** is the ultimate AI Operating System for Corporate Communications. It upgrades the original Blaze Protocol with enterprise-grade governance, financial tracking, and advanced multi-agent orchestration.
 
 ---
@@ -16,9 +20,9 @@
 - **Compliance Guard**: Automated legal and PR risk scanning for every post before it goes live.
 
 ### 🧠 Advanced Agent Fleet
-- **The Sentinel**: 24/7 Social Listening agent that monitors competitors and sentiment trends.
-- **Community Agent**: Unified Inbox with AI "Smart Replies" for LinkedIn, Twitter, and Instagram.
-- **Video Director**: Expanded Script-to-Storyboard pipeline with NanoBanana (Gemini 3 Pro) integration.
+- **The Sentinel**: 24/7 Social Listening agent that monitors competitors and sentiment trends. *(Beta)*
+- **Community Agent**: Unified Inbox with AI "Smart Replies" for LinkedIn, Twitter, and Instagram. *(WIP)*
+- **Video Director**: Expanded Script-to-Storyboard pipeline with NanoBanana (Gemini 3 Pro) integration. *(Experimental)*
 
 ### ⚡ Core Capabilities
 - **Magic Studio**: A team of 4 specialized agents (Strategist, Creator, Art Director, Reviewer) working in sequence.

@@ -1,5 +1,9 @@
 # 📚 API Reference & Code Documentation
 
+> [!NOTE]
+> **API Stability**
+> The internal APIs documented here, especially for the *Agent Development Kit (ADK)*, are subject to breaking changes as we iterate on the Multi-Agent architecture.
+
 This document provides a detailed technical breakdown of the classes, functions, and modules in **Deviceterra**. Use this reference when modifying the codebase.
 
 ---

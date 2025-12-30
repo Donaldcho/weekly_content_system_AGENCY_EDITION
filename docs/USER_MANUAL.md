@@ -1,5 +1,9 @@
 # 📘 Deviceterra Enterprise User Manual
 
+> [!CAUTION]
+> **Beta Software**
+> Many features described in this manual (e.g., *Sentiment Analysis*, *Video Director*) are currently in active development. You may encounter "Mock Data" or placeholder UI elements while we finalize the backend connections.
+
 This manual provides a comprehensive guide to using the **Deviceterra Enterprise** marketing operating system.
 
 ---
