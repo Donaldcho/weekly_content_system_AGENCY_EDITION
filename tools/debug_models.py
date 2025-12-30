@@ -3,7 +3,7 @@ import os
 import sys
 
 # Add parent directory to path to import project_config
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from project_config import Config
 
 def test_link():
