@@ -4,86 +4,63 @@ This document provides a detailed technical breakdown of the classes, functions,
 
 ---
 
-## 🏗️ Backend Core (`backend/`)
+## 🏗️ Core Engines (`backend/`)
 
 ### 🍌 `NanoBanana` (`backend/nano_banana.py`)
-The dedicated image generation engine. It abstracts away the complexity of switching between different Google AI models.
-
-#### Class: `NanoBanana(tier="Pro")`
-*   **`__init__(tier)`**: Initializes the Google GenAI client based on the tier configuration.
-*   **`generate_image(prompt, output_filename, ...)`**
-    *   **The "Universal Switch"**:
-        *   Detects if `active_model` is **Gemini** (Multimodal) or **Imagen** (Pure Image).
-        *   **Gemini Path**: Calls `client.models.generate_content()` with `response_modalities=['IMAGE']`.
-        *   **Imagen Path**: Calls `client.models.generate_images()`.
-    *   **Returns**: Absolute path to the saved image file.
-*   **`_dream_concept(prompt)`**: Fallback method. Uses Gemini Text to describe a visual concept if the image API fails.
+The dedicated image generation engine.
+*   **`generate_image(prompt, ...)`**: The Universal Switch (Gemini/Imagen).
+*   **`_dream_concept(prompt)`**: Fallback method using text-to-image description.
 
 ### 🧠 `ContentGenerator` (`backend/content_generator.py`)
-The legacy orchestrator (Monolith). Handles state management and high-level workflow.
+The central orchestrator for weekly planning.
+*   **`generate_weekly_plan(topic)`**: Coordinates Strategist/Creator agents.
+*   **`generate_campaign(topic, source_text)`**: Used by the **Multiplier** to repurposed content.
 
-#### Class: `ContentGenerator`
-*   **`generate_weekly_plan(topic, usage_rag)`**:
-    *   The entry point for the "Generate Week" button.
-    *   **Logic Flow**:
-        1.  Calls `MarketingAgency` (ADK) to invoke the **Strategist**.
-        2.  Receives a 7-day plan (JSON).
-        3.  Iterates through the plan, calling the **Creator Agent** for drafts.
-        4.  Returns a list of `Post` objects.
-*   **`generate_tailored_image_prompt(post_content, style)`**:
-    *   Uses **Prompt Registry** (`smart_style_generator`) to rewrite a blog post into an image prompt.
+### 📡 `SentinelAgent` (`backend/sentinel_agent.py`)
+Handles social listening and scraping.
+*   **`monitor_competitors()`**: Scrapes configured URLs/APIs for competitor updates. Returns a list of `Alert` objects.
+*   **`fetch_trends()`**: analyzing global trends and returns `Trend` objects with `growth` and `relevance` scores.
+*   **`analyze_brand_mentions()`**: Performs sentiment analysis on retrieved text corpus.
 
-### 📚 `PromptRegistry` (`backend/prompt_registry.py`)
-Decouples system instructions from Python code.
+### 🎬 `VideoDirector` (`backend/video_director.py`)
+Manages the script-to-video pipeline.
+*   **`generate_script(topic)`**: Uses LLM to write a 3-act script.
+*   **`create_storyboard(script)`**: Breaks script into scenes and generates image prompts for each.
+*   **`render_video(storyboard_assets)`**: (Experimental) stitches images + audio using ffmpeg wrapper.
 
-#### Class: `PromptRegistry`
-*   **`get(key, **kwargs)`**:
-    *   Loads the JSON string from `assets/prompts.json`.
-    *   Formats it with dynamic values (e.g., `{topic}`, `{brand_name}`).
-    *   **Usage**: `registry.get("visual_agent_system", topic="AI")`.
+### 🎨 `CanvasEngine` (`backend/canvas_engine.py`)
+Backend logic for the Visual Editor.
+*   **`apply_filter(image_path, filter_name)`**: Applies PIL image enhancements.
+*   **`composite_layer(base_image, overlay_image, position)`**: Merges layers.
+
+### 💬 `CommunityAgent` (`backend/community_agent.py`)
+Manages the Combined Inbox.
+*   **`fetch_messages(folder)`**: Retrieves messages from DB mock or API.
+*   **`generate_smart_reply(message_context)`**: Uses Gemini to draft 3 response options.
 
 ---
 
 ## 🕵️ Agent Development Kit (`backend/adk/`)
+The modular brain of the system.
 
-### 🏢 `MarketingAgency` (`backend/adk/main.py`)
-The Facade pattern controller for the ADK. It manages the lifecycle of specialized agents.
+### `MarketingAgency` (`backend/adk/main.py`)
+*   **`create_strategy(topic)`**: Hires `StrategistAgent`.
+*   **`generate_visual(...)`**: Hires `VisualDesignAgent`.
+*   **`build_website(...)`**: Hires `WebDevAgent`.
 
-*   **`create_strategy(topic, brand_info)`**: Hires `StrategistAgent` to plan the week.
-*   **`generate_visual(...)`**: Hires `VisualDesignAgent` to craft art prompts.
-*   **`design_logo(...)`**: Hires `LogoDesignAgent`.
-
-### 🤖 `BaseAdkAgent` (`backend/adk/agents/base.py`)
-The parent class for all agents.
-*   **`generate(prompt, json_mode=True)`**:
-    *   Wrapper around Gemini API.
-    *   If `json_mode=True`, forces `response_mime_type="application/json"` to ensure structural stability.
-
----
-
-## 🖥️ UI Layer (`ui/`)
-
-### `generate.py`
-The main interactive page.
-*   **`render_generate_page()`**:
-    *   Draws the explicit sidebar inputs.
-    *   **State Management**: Uses `st.session_state['generated_plan']` to persist data between re-runs.
-    *   **Button Logic**:
-        *   "Generate Weekly Plan" -> Calls `backend.ContentGenerator`.
-        *   "Summon Nano Banana" -> Calls `backend.NanoBanana`.
+### `BaseAdkAgent` (`backend/adk/agents/base.py`)
+*   **`generate(prompt, json_mode)`**: Wrapper for consistent JSON outputs from Gemini.
 
 ---
 
 ## 💾 Database Schema (`backend/database.py`)
+*   **`posts`**: Weekly content.
+*   **`brand_identity`**: Brand DNA.
+*   **`messages`**: Inbox data for Community Central.
+*   **`competitor_intel`**: Stored alerts from Sentinel.
 
-### Table: `posts`
-*   `id`: INTEGER PK
-*   `topic`: TEZT
-*   `platform`: TEXT (LinkedIn/Facebook)
-*   `content`: TEXT (The post body)
-*   `image_path`: TEXT (Local path to generated image)
-*   `status`: TEXT (Draft/Scheduled/Published)
-*   `scheduled_date`: DATETIME
+---
 
-### Table: `brand_identity`
-*   Stores the JSON blob of the user's configured "Brand DNA".
+## 📚 `PromptRegistry` (`backend/prompt_registry.py`)
+The configuration engine for Agent Personalities.
+*   **`assets/prompts.json`**: Edit this file to change the behavior of any agent without touching code.

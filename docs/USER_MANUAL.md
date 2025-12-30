@@ -1,81 +1,98 @@
-# 📘 Deviceterra User Manual
+# 📘 Deviceterra Enterprise User Manual
 
-Welcome to **Deviceterra**, your automated AI Marketing Agency. This guide will help you produce weeks of high-quality social media content in minutes.
-
----
-
-## 🚀 Getting Started
-
-### 1. Dashboard Overview
-Upon logging in, you will see the **Mission Control**.
-*   **Generate**: The primary workspace for creating content.
-*   **Schedule**: view your calendar grid.
-*   **Brand DNA**: Configure your company's voice and style.
-*   **Vault**: Your asset library (saved visuals).
+This manual provides a comprehensive guide to using the **Deviceterra Enterprise** marketing operating system.
 
 ---
 
-## 🎨 Step 1: Define Your Brand
-Before generating content, teach the AI who you are.
+## 🏗️ Core Modules Overview
 
-1.  Navigate to **Brand DNA** in the sidebar.
-2.  **Basic Info**: Enter your Company Name and Industry.
-3.  **Target Audience**: Describe who you are talking to (e.g., "CTOs of Series A startups").
-4.  **Brand Voice**: Choose a tone (e.g., "Professional", "Witty") or paste a sample of your writing for analysis.
-5.  **Visual Identity**: Define your color palette and preferred art style (e.g., "Minimalist Tech", "Cyberpunk").
-    *   *Tip: Use the "Visualize" preview to see how your style looks.*
-
----
-
-## ⚡ Step 2: Generate a Weekly Plan
-The **Strategist Agent** plans your week based on your brand and trends.
-
-1.  Navigate to **Generate**.
-2.  **Campaign Topic**: Enter a main theme (e.g., "The Future of AI Agents").
-3.  **Trend Data**: (Optional) Paste links or keywords about current news.
-4.  Click **✨ Generate Weekly Plan**.
-5.  **Review**: The Agents will produce 5-7 drafts (LinkedIn/Facebook post pairs).
-    *   Read the drafts.
-    *   Click **Edit** on any text to tweak the copy.
+| Feature | Purpose |
+| :--- | :--- |
+| **🏢 Command Center** | High-level agency metrics and active campaign status. (Admin Only) |
+| **📊 Dashboard** | Your personal performance overview and task list. |
+| **✨ Content Studio** | The primary workspace for generating weekly plans and posts. |
+| **📡 The Sentinel** | AI-powered social listening and competitor tracking. |
+| **🎬 AI Video Director** | Transforms blog posts or ideas into video scripts and storyboards. |
+| **🚀 Multiplier** | The "Repurpose Engine". Turns 1 post into 6 (LinkedIn, X, Newsletter, etc). |
+| **🎨 Visual Editor** | A Canva-like drag-and-drop editor for refining AI images. |
+| **💬 Community Central** | Unified Inbox for LinkedIn, X, and Instagram DMs/Comments. |
+| **🧬 Brand DNA** | Configure your AI's voice, tone, and visual identity. |
 
 ---
 
-## 🍌 Step 3: Nano Banana Vision (Images)
-Bring your posts to life with the integrated image engine.
+## 1. 📡 The Sentinel (Social Listening)
+**Purpose**: Monitor competitors and industry trends in real-time.
 
-1.  Scroll to the **Visuals** section of a post draft.
-2.  **Source**:
-    *   **Smart Style**: AI automatically dreams up a prompt based on the post text.
-    *   **Prompt**: Write your own description.
-    *   **Vault**: Pick a pre-saved image.
-3.  **Engine Class**:
-    *   **Nano Pro**: Highest quality (slower). Best for final assets.
-    *   **Nano**: Faster, good for drafting.
-4.  Click **✨ Summon Nano Banana**.
-5.  The image will appear. If you don't like it, click **Re-roll**.
+1.  **Competitor Watch**: Click "Scan Competitor Networks" to pull the latest news on rivals.
+    *   *Alerts*: High-priority alerts (e.g., "Competitor launching new product") appear in Red.
+2.  **Trend Radar**: View "Trending Topics" sorted by Growth and Relevance.
+    *   *Action*: Click "⚡ Trendjack This" to instantly draft a post about a trending topic.
+3.  **Brand Heatmap**: Shows the ratio of Positive/Negative mentions of your brand.
 
 ---
 
-## 📅 Step 4: Schedule & Publish
-1.  Once happy with text and image, click **📅 Schedule**.
-2.  Navigate to the **Schedule** page to see your calendar.
-3.  (Future Feature) Automated posting to LinkedIn via API is configured in the **Connections** tab.
+## 2. 🎬 AI Video Director
+**Purpose**: Create video content without filming.
+
+1.  **Input**: Paste a topic or a blog URL.
+2.  **Script Gen**: The AI writes a "Hook, Body, CTA" script tailored for TikTok/Reels or YouTube.
+3.  **Storyboard**: It breaks the script into scenes and generates optimal image prompts for each scene.
+4.  **Audio**: (If enabled) Generates an AI Voiceover file.
 
 ---
 
-## 🧠 Advanced: Customizing the AI Personality
-Want the "Creative Director" to think differently?
+## 3. 🚀 Multiplier (Repurpose Engine)
+**Purpose**: "Write Once, Distribute Everywhere."
 
-1.  Open the file `assets/prompts.json` in your project folder.
-2.  Edit the **System Instructions** for `visual_agent_system` or `smart_style_generator`.
-3.  Save the file. The agents update instantly—no restart required.
+1.  **Source**: Paste your "Main Idea" (e.g., a LinkedIn thought leadership post) on the left.
+2.  **Multiply**: Click the rocket button.
+3.  **The Matrix**: The AI generates optimized versions for:
+    *   **X (Twitter)**: Converts paragraphs into a thread.
+    *   **Instagram**: Creates a visual caption.
+    *   **Newsletter**: Expands into a standard email format.
+    *   **TikTok**: Writes a spoken-word script.
+4.  **Visuals**: Use the mini-studio in the Instagram box to paint a fresh image instantly.
 
 ---
 
-## ❓ FAQ
+## 4. 🎨 Visual Editor (Canvas)
+**Purpose**: Edit the "Nano Banana" images.
 
-**Q: Why do my images look like neon sci-fi?**
-A: Check your `prompts.json`. Ensure you haven't told the AI to always use "Futuristic" styles. You can tone it down by adding "Realistic, corporate photography" to your Brand DNA.
+1.  **Load**: Select an image from the Vault or Generation history.
+2.  **Edit**:
+    *   **Text Overlay**: Add headlines over the image.
+    *   **Filters**: Apply specific color grading.
+    *   **Layers**: Arrange multiple elements (drag-and-drop).
+3.  **Save**: Puts the final asset back into the Vault for scheduling.
 
-**Q: I get a "Quota Exceeded" error.**
-A: You may have hit the free tier limit of the Google Gemini API. Wait a few minutes or upgrade your API key quotas.
+---
+
+## 5. 💬 Community Central (Inbox)
+**Purpose**: Reply to comments and DMs from one place.
+
+1.  **Smart Reply**: Select a message. The AI analyzes the sentiment and suggests 3 draft replies (Friendly, Professional, Witty).
+2.  **One-Click Send**: Choose a draft, edit if needed, and hit send.
+3.  **Folders**: Auto-sorts messages into Inbox, Done, and Spam.
+
+---
+
+## 6. ✨ Content Studio (The Core)
+**Purpose**: Plan and generate your weekly content calendar.
+
+1.  **Campaign**: Define a weekly topic (e.g. "AI Ethics").
+2.  **Generate Plan**: The **Strategist Agent** creates a 7-day outline.
+3.  **Draft**: The **Creator Agent** writes the posts.
+4.  **Visuals**: The **Nano Banana** engine creates the art.
+    *   *Universal Switch*: Automatically uses Gemini 3 Pro (Complex) or Imagen 3 (Fast) based on the prompt complexity.
+
+---
+
+## ⚙️ Administration
+*   **User Management**: create 'Editor' or 'Writer' accounts with restricted permissions.
+*   **Connections**: Link your LinkedIn and Facebook pages via OAuth.
+
+---
+
+## 🔧 Troubleshooting
+*   **"Video Generation Failed"**: Ensure you have a valid `ffmpeg` installation if running locally.
+*   **"Sentinel Offline"**: Check your internet connection; scraping requires live access.
